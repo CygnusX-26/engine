@@ -66,8 +66,9 @@ async fn main() {
         for mesh in models.iter() {
             let model = &mesh.0;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
+            let mut transformed_verts: Vec<Vector4<f32>> = Vec::new();
             let model_mat = Rotation3::from_axis_angle(&Vector3::x_axis(), radians).to_homogeneous()
-                * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 2.0).to_homogeneous();
+                * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 1.5).to_homogeneous();
 
             let proj = proj_mat * view_mat * model_mat;     
 
@@ -76,13 +77,14 @@ async fn main() {
                 let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
                 zbuffer.push(persproj.z);
                 screen_verts.push(Point2::new(persproj.x / persproj.z, persproj.y / persproj.z));
+                transformed_verts.push(model_mat * Vector4::from(vertex));
             }
 
             let mut z_ordered_tris: Vec<(usize, usize, usize, Color, f32)> = model.tris().iter().map(
                 |tri| -> (usize, usize, usize, Color, f32) {
-                    let z = (model.verts()[tri.0].z +
-                        model.verts()[tri.1].z +
-                        model.verts()[tri.2].z) / 3.0;
+                    let z = (transformed_verts[tri.0].z +
+                        transformed_verts[tri.1].z +
+                        transformed_verts[tri.2].z) / 3.0;
                     (tri.0, tri.1, tri.2, tri.3, z)
                 }
             ).collect();
@@ -99,9 +101,9 @@ async fn main() {
                 let s2 = screen_verts[tri.1];
                 let s3 = screen_verts[tri.2];
 
-                let v1: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.0]);
-                let v2: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.1]);
-                let v3: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.2]);
+                let v1: Vector4<f32> =  transformed_verts[tri.0];
+                let v2: Vector4<f32> =  transformed_verts[tri.1];
+                let v3: Vector4<f32> =  transformed_verts[tri.2];
 
                 let v1 = Vector3::new(v1.x, v1.y, v1.z);
                 let v2 = Vector3::new(v2.x, v2.y, v2.z);
