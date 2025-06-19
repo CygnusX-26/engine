@@ -9,7 +9,7 @@ pub struct LetterNMesh {
 }
 
 impl LetterNMesh {
-    pub fn _new() -> Self {
+    pub fn new() -> Self {
         Self {
             verts: vec![
                 Point3::new(-2.0, -2.0, -1.0),
@@ -35,11 +35,11 @@ impl LetterNMesh {
             ],
             tris: vec![
                 (0, 2, 1, RED),
-                (2, 3, 1, RED),
+                (1, 2, 3, RED),
                 (8, 6, 7, RED),
-                (6, 5, 7, RED),
+                (7, 6, 5, RED),
                 (8, 9, 4, RED),
-                (4, 9, 3, RED),
+                (3, 4, 9, RED),
                 (10, 11, 12, BLUE),
                 (12, 11, 13, BLUE),
                 (18, 17, 16, BLUE),

@@ -6,6 +6,9 @@ use mesh::cube::CubeMesh;
 use mesh::cylinder::CylinderMesh;
 use mesh::cone::ConeMesh;
 use mesh::Mesh as MyMesh;
+use ordered_float::OrderedFloat;
+
+use crate::mesh::letter_n::LetterNMesh;
 
 pub struct Object(Box<dyn MyMesh>, f32, f32);
 
@@ -50,6 +53,7 @@ async fn main() {
     models.push(Object(Box::new(CubeMesh::new()), 400.0, 50.0));
     models.push(Object(Box::new(CubeMesh::new()), 500.0, 50.0));
     models.push(Object(Box::new(CylinderMesh::new(3.0, 1.0)), 600.0, 50.0));
+    models.push(Object(Box::new(LetterNMesh::new()), 400.0, 200.0));
 
     const SCALE: f32 = 50.0;
     let mut radians: f32 = 0.0;
@@ -57,23 +61,40 @@ async fn main() {
     loop {
         clear_background(WHITE);
 
+        let mut zbuffer: Vec<f32> = Vec::new();
+
         for mesh in models.iter() {
             let model = &mesh.0;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let model_mat = Rotation3::from_axis_angle(&Vector3::x_axis(), radians).to_homogeneous()
                 * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 2.0).to_homogeneous();
 
-            let proj =        proj_mat * view_mat * model_mat;     
+            let proj = proj_mat * view_mat * model_mat;     
 
             for i in 0..model.verts().len() {
                 let vertex = model.verts()[i];
                 let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
-                screen_verts.push(Point2::new(persproj.x / persproj.z, persproj.y / persproj.z))
+                zbuffer.push(persproj.z);
+                screen_verts.push(Point2::new(persproj.x / persproj.z, persproj.y / persproj.z));
             }
+
+            let mut z_ordered_tris: Vec<(usize, usize, usize, Color, f32)> = model.tris().iter().map(
+                |tri| -> (usize, usize, usize, Color, f32) {
+                    let z = (model.verts()[tri.0].z +
+                        model.verts()[tri.1].z +
+                        model.verts()[tri.2].z) / 3.0;
+                    (tri.0, tri.1, tri.2, tri.3, z)
+                }
+            ).collect();
+            z_ordered_tris.sort_by_key(
+                |tri| -> OrderedFloat<f32> {
+                    OrderedFloat(tri.4)
+                }
+            );
 
             let shift_x: f32 = mesh.1;
             let shift_y: f32 = mesh.2;
-            for tri in model.tris() {
+            for tri in z_ordered_tris {
                 let s1 = screen_verts[tri.0];
                 let s2 = screen_verts[tri.1];
                 let s3 = screen_verts[tri.2];
