@@ -9,9 +9,7 @@ pub struct LetterNMesh {
 }
 
 impl LetterNMesh {
-    pub fn new() -> Self {
-
-
+    pub fn _new() -> Self {
         Self {
             verts: vec![
                 Point3::new(-2.0, -2.0, -1.0),

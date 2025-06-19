@@ -1,13 +1,11 @@
 mod mesh;
 
-use nalgebra::{Matrix4, Point3, Vector3, Perspective3, Point2, Point4, Rotation3};
+use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Rotation3, Vector3, Vector4};
 use macroquad::prelude::*;
 use mesh::cube::CubeMesh;
+use mesh::cylinder::CylinderMesh;
 use mesh::cone::ConeMesh;
 use mesh::Mesh as MyMesh;
-
-use crate::mesh::cylinder::CylinderMesh;
-use crate::mesh::letter_n::LetterNMesh;
 
 pub struct Object(Box<dyn MyMesh>, f32, f32);
 
@@ -18,7 +16,8 @@ pub struct Camera {
 }
 
 pub struct Light {
-    pub direction: Point3<f32>
+    pub direction: Vector3<f32>,
+    pub intensity: f32
 }
 
 impl Camera {
@@ -34,14 +33,14 @@ fn is_front_facing(p1: Vec2, p2: Vec2, p3: Vec2) -> bool {
 
 #[macroquad::main("Renderer")]
 async fn main() {
-    let mut camera = Camera {
+    let camera = Camera {
         position: Point3::new(0.0, 0.0,4.0), 
         direction: Point3::new(0.0, 0.0, 0.0),
         up: Vector3::new(0.0, 1.0, 0.0)
     };
 
-    let _light = Light { direction: Point3::new(0.0, 0.0, 1.0)};
-    let mut view_mat: Matrix4<f32> = camera.generate_view_mat();
+    let light = Light { direction: Vector3::new(0.0, 1.0, -2.0), intensity: 1.0};
+    let view_mat: Matrix4<f32> = camera.generate_view_mat();
     let proj_mat: Matrix4<f32> = *Perspective3::new(screen_width()/screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
     let mut models: Vec<Object> = Vec::new();
@@ -75,11 +74,35 @@ async fn main() {
             let shift_x: f32 = mesh.1;
             let shift_y: f32 = mesh.2;
             for tri in model.tris() {
-                let t1 = Vec2 { x: SCALE * screen_verts[tri.0].x + shift_x, y: SCALE * screen_verts[tri.0].y + shift_y};
-                let t2 = Vec2 { x: SCALE * screen_verts[tri.1].x + shift_x, y: SCALE * screen_verts[tri.1].y + shift_y};
-                let t3 = Vec2 { x: SCALE * screen_verts[tri.2].x + shift_x, y: SCALE * screen_verts[tri.2].y + shift_y};
+                let s1 = screen_verts[tri.0];
+                let s2 = screen_verts[tri.1];
+                let s3 = screen_verts[tri.2];
+
+                let v1: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.0]);
+                let v2: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.1]);
+                let v3: Vector4<f32> =  model_mat * Vector4::from(model.verts()[tri.2]);
+
+                let v1 = Vector3::new(v1.x, v1.y, v1.z);
+                let v2 = Vector3::new(v2.x, v2.y, v2.z);
+                let v3 = Vector3::new(v3.x, v3.y, v3.z);
+
+                let vec1 = (v2 - v1).normalize();
+                let vec2 = (v3 - v1).normalize();
+                let norm = vec1.cross(&vec2);
+
+                let brightness = norm.dot(&(light.direction.normalize())).max(0.0).min(1.0) * light.intensity;
+                let color = Color {
+                    r: tri.3.r * brightness,
+                    g: tri.3.g * brightness,
+                    b: tri.3.b * brightness,
+                    a: tri.3.a
+                };
+
+                let t1 = Vec2 { x: SCALE * s1.x + shift_x, y: SCALE * s1.y + shift_y};
+                let t2 = Vec2 { x: SCALE * s2.x + shift_x, y: SCALE * s2.y + shift_y};
+                let t3 = Vec2 { x: SCALE * s3.x + shift_x, y: SCALE * s3.y + shift_y};
                 if is_front_facing(t1, t2, t3) {
-                    draw_triangle( t1, t2, t3, tri.3 );
+                    draw_triangle( t1, t2, t3, color );
                 }
             }
         }

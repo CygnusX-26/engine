@@ -1,5 +1,5 @@
 
-use macroquad::color::{Color, RED, GREEN, BLUE, ORANGE};
+use macroquad::color::{Color, BLUE, GREEN, ORANGE, RED};
 use nalgebra::{Point3};
 use crate::mesh::Mesh;
 use std::f32::consts::PI;
@@ -37,7 +37,7 @@ impl CylinderMesh {
         for i in 0..12 {
             let next = (i + 1) % 12;
             tris.push((i, next, i + 12, RED));
-            tris.push((next, next + 12, i + 12, ORANGE));
+            tris.push((next + 12, i + 12, next, ORANGE));
             tris.push((next, i, 24, BLUE));
             tris.push((i + 12, next + 12, 25, GREEN));
         }
