@@ -1,4 +1,4 @@
-use macroquad::color::{Color, RED, GREEN, BLUE, PURPLE};
+use macroquad::color::{Color, BLUE, GOLD, GREEN, PINK, PURPLE, RED};
 use nalgebra::{Point3};
 use crate::mesh::Mesh;
 
@@ -40,18 +40,37 @@ impl LetterNMesh {
                 (7, 6, 5, RED),
                 (8, 9, 4, RED),
                 (3, 4, 9, RED),
+
                 (10, 11, 12, BLUE),
-                (12, 11, 13, BLUE),
+                (11, 13, 12, BLUE),
                 (18, 17, 16, BLUE),
-                (16, 17, 15, BLUE),
+                (15, 16, 17, BLUE),
                 (18, 14, 19, BLUE),
-                (14, 13, 19, BLUE),
+                (13, 19, 14, BLUE),
+
                 (0, 11, 10, GREEN),
-                (0, 1, 11, GREEN),
+                (11, 0, 1, GREEN),
                 (6, 15, 5, GREEN),
-                (6, 16, 15, GREEN),
-                (2, 14, 4, PURPLE),
-                (2, 12, 14, PURPLE)
+                (15, 6, 16, GREEN),
+
+                (4, 2, 14, PURPLE),
+                (2, 12, 14, PURPLE),
+                (7, 17, 9, PURPLE),
+                (9, 17, 19, PURPLE),
+
+                (4, 14, 8, PINK),
+                (8, 14, 18, PINK),
+                (3, 9, 13, PINK),
+                (19, 13, 9, PINK),
+
+                (1, 3, 13, GOLD),
+                (1, 13, 11, GOLD),
+                (7, 5, 15, GOLD),
+                (7, 15, 17, GOLD),
+                (0, 12, 2, GOLD),
+                (0, 10, 12, GOLD),
+                (8, 16, 6, GOLD),
+                (8, 18, 16, GOLD)
                 // TODO later
             ]
         }
