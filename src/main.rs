@@ -51,7 +51,6 @@ async fn main() {
     models.push(Object(Box::new(CubeMesh::new()), 400.0, 50.0));
     models.push(Object(Box::new(CubeMesh::new()), 500.0, 50.0));
     models.push(Object(Box::new(CylinderMesh::new(3.0, 1.0)), 600.0, 50.0));
-    models.push(Object(Box::new(LetterNMesh::new()), 700.0, 50.0));
 
     const SCALE: f32 = 50.0;
     let mut radians: f32 = 0.0;

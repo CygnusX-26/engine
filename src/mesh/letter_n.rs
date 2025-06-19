@@ -1,4 +1,4 @@
-use macroquad::color::{Color, RED, GREEN, YELLOW, BLUE, PURPLE, ORANGE, BEIGE, LIME, PINK, GOLD, GRAY, DARKBLUE, SKYBLUE};
+use macroquad::color::{Color, RED, GREEN, BLUE, PURPLE};
 use nalgebra::{Point3};
 use crate::mesh::Mesh;
 
