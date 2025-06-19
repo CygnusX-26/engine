@@ -2,6 +2,8 @@
 
 Just a collection of random meshes I make while bored at work.
 
+![shapes](shapes.gif)
+
 ## Run
 
 `cargo run`
