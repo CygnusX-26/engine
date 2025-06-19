@@ -7,6 +7,7 @@ use mesh::cone::ConeMesh;
 use mesh::Mesh as MyMesh;
 
 use crate::mesh::cylinder::CylinderMesh;
+use crate::mesh::letter_n::LetterNMesh;
 
 pub struct Object(Box<dyn MyMesh>, f32, f32);
 
@@ -33,15 +34,14 @@ fn is_front_facing(p1: Vec2, p2: Vec2, p3: Vec2) -> bool {
 
 #[macroquad::main("Renderer")]
 async fn main() {
-    let camera = Camera {
+    let mut camera = Camera {
         position: Point3::new(0.0, 0.0,4.0), 
         direction: Point3::new(0.0, 0.0, 0.0),
         up: Vector3::new(0.0, 1.0, 0.0)
     };
 
     let _light = Light { direction: Point3::new(0.0, 0.0, 1.0)};
-
-    let view_mat: Matrix4<f32> = camera.generate_view_mat();
+    let mut view_mat: Matrix4<f32> = camera.generate_view_mat();
     let proj_mat: Matrix4<f32> = *Perspective3::new(screen_width()/screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
     let mut models: Vec<Object> = Vec::new();
@@ -51,6 +51,7 @@ async fn main() {
     models.push(Object(Box::new(CubeMesh::new()), 400.0, 50.0));
     models.push(Object(Box::new(CubeMesh::new()), 500.0, 50.0));
     models.push(Object(Box::new(CylinderMesh::new(3.0, 1.0)), 600.0, 50.0));
+    models.push(Object(Box::new(LetterNMesh::new()), 700.0, 50.0));
 
     const SCALE: f32 = 50.0;
     let mut radians: f32 = 0.0;
