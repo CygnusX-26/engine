@@ -2,10 +2,13 @@ mod mesh;
 
 use nalgebra::{Matrix4, Point3, Vector3, Perspective3, Point2, Point4, Rotation3};
 use macroquad::prelude::*;
-use mesh::cube::cube_mesh::CubeMesh;
+use mesh::cube::CubeMesh;
+use mesh::cone::ConeMesh;
 use mesh::Mesh as MyMesh;
 
-use crate::mesh::cone::cone_mesh::ConeMesh;
+use crate::mesh::cylinder::CylinderMesh;
+
+pub struct Object(Box<dyn MyMesh>, f32, f32);
 
 pub struct Camera {
     pub position: Point3<f32>,
@@ -39,13 +42,17 @@ async fn main() {
     let _light = Light { direction: Point3::new(0.0, 0.0, 1.0)};
 
     let view_mat: Matrix4<f32> = camera.generate_view_mat();
-    let proj_mat: Matrix4<f32> = *Perspective3::new(1.0, 1.0, 0.1, 200.0).as_matrix();
+    let proj_mat: Matrix4<f32> = *Perspective3::new(screen_width()/screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
-    let mut models: Vec<(Box<dyn MyMesh>, f32, f32)> = Vec::new();
-    models.push((Box::new(ConeMesh::new(2.0, 1.5)), 200.0, 0.0));
-    models.push((Box::new(CubeMesh::new()), 300.0, 0.0));
+    let mut models: Vec<Object> = Vec::new();
+    models.push(Object(Box::new(ConeMesh::new(2.0, 1.0)), 100.0, 50.0));
+    models.push(Object(Box::new(CubeMesh::new()), 200.0, 50.0));
+    models.push(Object(Box::new(ConeMesh::new(2.0, 1.0)), 300.0, 50.0));
+    models.push(Object(Box::new(CubeMesh::new()), 400.0, 50.0));
+    models.push(Object(Box::new(CubeMesh::new()), 500.0, 50.0));
+    models.push(Object(Box::new(CylinderMesh::new(3.0, 1.0)), 600.0, 50.0));
 
-    const SCALE: f32 = 100.0;
+    const SCALE: f32 = 50.0;
     let mut radians: f32 = 0.0;
 
     loop {
@@ -55,20 +62,22 @@ async fn main() {
             let model = &mesh.0;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let model_mat = Rotation3::from_axis_angle(&Vector3::x_axis(), radians).to_homogeneous()
-                * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 1.5).to_homogeneous();
+                * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 2.0).to_homogeneous();
 
-            
+            let proj =        proj_mat * view_mat * model_mat;     
+
             for i in 0..model.verts().len() {
                 let vertex = model.verts()[i];
-                let persproj = proj_mat * view_mat * model_mat * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
+                let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
                 screen_verts.push(Point2::new(persproj.x / persproj.z, persproj.y / persproj.z))
             }
 
-            let shift: f32 = mesh.1;
+            let shift_x: f32 = mesh.1;
+            let shift_y: f32 = mesh.2;
             for tri in model.tris() {
-                let t1 = Vec2 { x: SCALE * screen_verts[tri.0].x + shift, y: SCALE * screen_verts[tri.0].y + shift};
-                let t2 = Vec2 { x: SCALE * screen_verts[tri.1].x + shift, y: SCALE * screen_verts[tri.1].y + shift};
-                let t3 = Vec2 { x: SCALE * screen_verts[tri.2].x + shift, y: SCALE * screen_verts[tri.2].y + shift};
+                let t1 = Vec2 { x: SCALE * screen_verts[tri.0].x + shift_x, y: SCALE * screen_verts[tri.0].y + shift_y};
+                let t2 = Vec2 { x: SCALE * screen_verts[tri.1].x + shift_x, y: SCALE * screen_verts[tri.1].y + shift_y};
+                let t3 = Vec2 { x: SCALE * screen_verts[tri.2].x + shift_x, y: SCALE * screen_verts[tri.2].y + shift_y};
                 if is_front_facing(t1, t2, t3) {
                     draw_triangle( t1, t2, t3, tri.3 );
                 }

@@ -1,5 +1,6 @@
 pub mod cube;
 pub mod cone;
+pub mod cylinder;
 
 use nalgebra::Point3;
 use macroquad::color::Color;
