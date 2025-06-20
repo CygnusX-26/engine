@@ -1,6 +1,9 @@
-use macroquad::color::{Color, RED, GREEN, YELLOW, BLUE, PURPLE, ORANGE, BEIGE, LIME, PINK, GOLD, GRAY, DARKBLUE, SKYBLUE};
-use nalgebra::{Point3};
 use crate::mesh::Mesh;
+use macroquad::color::{
+    BEIGE, BLUE, Color, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, SKYBLUE,
+    YELLOW,
+};
+use nalgebra::Point3;
 use std::f32::consts::PI;
 
 #[derive(Debug)]
@@ -11,17 +14,16 @@ pub struct ConeMesh {
 
 impl ConeMesh {
     pub fn new(height: f32, radius: f32) -> Self {
-
         let offset = -height / 2.0;
 
-        let mut verts: Vec<Point3<f32>> = (0..12).map(
-            |x| -> Point3<f32> {
+        let mut verts: Vec<Point3<f32>> = (0..12)
+            .map(|x| -> Point3<f32> {
                 let angle = 2.0 * PI * (x as f32) / 12.0;
                 let x = radius * angle.cos();
                 let z = radius * angle.sin();
                 Point3::new(x, offset, z)
-            }
-        ).collect();
+            })
+            .collect();
 
         verts.push(Point3::new(0.0, height + offset, 0.0));
         verts.push(Point3::new(0.0, offset, 0.0));
@@ -52,8 +54,8 @@ impl ConeMesh {
                 (8, 13, 9, SKYBLUE),
                 (9, 13, 10, RED),
                 (10, 13, 11, SKYBLUE),
-                (11, 13, 0, RED)
-            ]
+                (11, 13, 0, RED),
+            ],
         }
     }
 }

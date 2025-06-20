@@ -1,7 +1,8 @@
-
-use macroquad::color::{Color, RED, GREEN, YELLOW, BLUE, PURPLE, ORANGE, BEIGE, LIME, PINK, GOLD, GRAY, DARKBLUE};
-use nalgebra::{Point3};
 use crate::mesh::Mesh;
+use macroquad::color::{
+    BEIGE, BLUE, Color, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, YELLOW,
+};
+use nalgebra::Point3;
 
 #[derive(Debug)]
 pub struct CubeMesh {
@@ -20,7 +21,7 @@ impl CubeMesh {
                 Point3::new(1.0, 1.0, 1.0),
                 Point3::new(1.0, 1.0, -1.0),
                 Point3::new(-1.0, 1.0, -1.0),
-                Point3::new(-1.0, 1.0, 1.0)
+                Point3::new(-1.0, 1.0, 1.0),
             ],
             tris: vec![
                 (0, 1, 2, RED),
@@ -34,8 +35,8 @@ impl CubeMesh {
                 (0, 4, 5, BEIGE),
                 (0, 5, 1, GOLD),
                 (3, 2, 6, GRAY),
-                (3, 6, 7, YELLOW)
-            ]
+                (3, 6, 7, YELLOW),
+            ],
         }
     }
 }
