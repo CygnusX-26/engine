@@ -11,7 +11,7 @@ pub struct CubeMesh {
 }
 
 impl CubeMesh {
-    pub fn new() -> Self {
+    pub fn _new() -> Self {
         Self {
             verts: vec![
                 Point3::new(1.0, -1.0, 1.0),

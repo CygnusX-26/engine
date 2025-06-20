@@ -2,12 +2,9 @@ mod mesh;
 
 use macroquad::prelude::*;
 use mesh::Mesh as MyMesh;
-use mesh::cone::ConeMesh;
-use mesh::cube::CubeMesh;
-use mesh::cylinder::CylinderMesh;
-use mesh::letter_n::LetterNMesh;
 use mesh::p_hack::PHackMesh;
-use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Rotation3, Vector3, Vector4};
+use mesh::tall_wall::TallWallMesh;
+use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 
 pub struct Object {
@@ -37,11 +34,13 @@ impl Camera {
     }
 }
 
+/// True if the triangle faces the cam. False, we dont need to draw it.
 fn is_front_facing(p1: Vec2, p2: Vec2, p3: Vec2) -> bool {
     let cross = (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
     cross > 0.0
 }
 
+/// Handle key press turning and etc... TODO add mouse movement
 fn handle_keys(camera: &mut Camera, move_speed: f32, turn_speed: f32) -> Matrix4<f32> {
     if is_key_down(KeyCode::A) {
         camera.yaw += turn_speed;
@@ -65,6 +64,13 @@ fn handle_keys(camera: &mut Camera, move_speed: f32, turn_speed: f32) -> Matrix4
     camera.generate_view_mat()
 }
 
+fn object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> {
+    let view_mat = camera.generate_view_mat();
+    let view_model = view_mat * model_mat;
+    let object_pos = view_model.transform_point(&Point3::origin());
+    OrderedFloat(object_pos.z)
+}
+
 #[macroquad::main("Renderer")]
 async fn main() {
     let mut camera = Camera {
@@ -84,28 +90,62 @@ async fn main() {
     let proj_mat: Matrix4<f32> =
         *Perspective3::new(screen_width() / screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
-    let models: Vec<Object> = vec![Object {
-        mesh: Box::new(PHackMesh::new()),
-        offset_x: 0.0,
-        offset_y: 0.0,
-        offset_z: 0.0,
-    }];
-
-    let mut radians: f32 = 0.0;
+    let models: Vec<Object> = vec![
+        Object {
+            mesh: Box::new(PHackMesh::new()),
+            offset_x: 0.0,
+            offset_y: 0.0,
+            offset_z: 0.0,
+        },
+        Object {
+            mesh: Box::new(PHackMesh::new()),
+            offset_x: 3.0,
+            offset_y: 0.0,
+            offset_z: 3.0,
+        },
+    ];
 
     loop {
         clear_background(WHITE);
 
         let view_mat: Matrix4<f32> = handle_keys(&mut camera, 0.1, 0.02);
 
-        for mesh in models.iter() {
+        let mut sorted_models: Vec<(&Object, Matrix4<f32>)> = models
+            .iter()
+            .map(|model| -> (&Object, Matrix4<f32>) {
+                (
+                    model,
+                    Matrix4::new(
+                        1.0,
+                        0.0,
+                        0.0,
+                        model.offset_x,
+                        0.0,
+                        1.0,
+                        0.0,
+                        model.offset_y,
+                        0.0,
+                        0.0,
+                        1.0,
+                        model.offset_z,
+                        0.0,
+                        0.0,
+                        0.0,
+                        1.0,
+                    ),
+                )
+            })
+            .collect();
+
+        sorted_models.sort_by_key(|(_, model_mat)| -> OrderedFloat<f32> {
+            object_depth(&camera, model_mat)
+        });
+
+        for (mesh, model_mat) in sorted_models.iter() {
             let model = &mesh.mesh;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
             let mut transformed_verts: Vec<Vector4<f32>> = Vec::new();
-            let model_mat = Rotation3::from_axis_angle(&Vector3::x_axis(), radians)
-                .to_homogeneous()
-                * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 1.5).to_homogeneous();
 
             let proj = proj_mat * view_mat * model_mat;
 
@@ -175,8 +215,6 @@ async fn main() {
                 }
             }
         }
-
-        radians += 0.00;
         next_frame().await;
     }
 }

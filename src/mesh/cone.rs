@@ -13,7 +13,7 @@ pub struct ConeMesh {
 }
 
 impl ConeMesh {
-    pub fn new(height: f32, radius: f32) -> Self {
+    pub fn _new(height: f32, radius: f32) -> Self {
         let offset = -height / 2.0;
 
         let mut verts: Vec<Point3<f32>> = (0..12)

@@ -3,6 +3,7 @@ pub mod cube;
 pub mod cylinder;
 pub mod letter_n;
 pub mod p_hack;
+pub mod tall_wall;
 
 use macroquad::color::Color;
 use nalgebra::Point3;
