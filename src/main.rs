@@ -30,7 +30,8 @@ pub struct Camera {
 
 pub struct Light {
     pub direction: Vector3<f32>,
-    pub intensity: f32
+    pub intensity: f32,
+    pub ambient: f32
 }
 
 impl Camera {
@@ -80,7 +81,7 @@ async fn main() {
         yaw: 0.0
     };
 
-    let light = Light { direction: Vector3::new(1.0, 0.0, 1.0), intensity: 1.0};
+    let light = Light { direction: Vector3::new(1.0, 0.0, 1.0), intensity: 1.0, ambient: 0.2};
     
     let proj_mat: Matrix4<f32> = *Perspective3::new(screen_width()/screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
@@ -163,7 +164,7 @@ async fn main() {
                 let vec2 = (v3 - v1).normalize();
                 let norm = vec1.cross(&vec2);
 
-                let brightness = norm.dot(&(light.direction.normalize())).max(0.0).min(1.0) * light.intensity;
+                let brightness = norm.dot(&(light.direction.normalize())).max(0.0).min(1.0) * light.intensity + light.ambient;
                 let color = Color {
                     r: tri.3.r * brightness,
                     g: tri.3.g * brightness,
