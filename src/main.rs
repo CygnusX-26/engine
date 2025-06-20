@@ -13,12 +13,19 @@ use ordered_float::OrderedFloat;
 
 
 
-pub struct Object(Box<dyn MyMesh>, f32, f32);
+pub struct Object {
+    mesh: Box<dyn MyMesh>,
+    offset_x: f32,
+    offset_y: f32,
+    offset_z: f32
+}
 
 pub struct Camera {
     pub position: Point3<f32>,
-    pub direction: Point3<f32>,
-    pub up: Vector3<f32>
+    pub target: Point3<f32>,
+    pub up: Vector3<f32>,
+    pub pitch: f32,
+    pub yaw: f32
 }
 
 pub struct Light {
@@ -28,48 +35,76 @@ pub struct Light {
 
 impl Camera {
     pub fn generate_view_mat(&self) -> Matrix4<f32> {
-        Matrix4::look_at_rh(&self.position, &self.direction, &self.up)
+        Matrix4::look_at_rh(&self.position, &self.target, &self.up)
     }
 }
 
 fn is_front_facing(p1: Vec2, p2: Vec2, p3: Vec2) -> bool {
     let cross = (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
-    cross < 0.0
+    cross > 0.0
+}
+
+fn handle_keys(camera: &mut Camera, move_speed: f32, turn_speed: f32) -> Matrix4<f32> {
+    if is_key_down(KeyCode::A) {
+        camera.yaw += turn_speed;
+        let radius = (camera.position - camera.target).norm();
+        camera.target.x = camera.position.x + radius * camera.yaw.sin();
+        camera.target.z = camera.position.z + radius * camera.yaw.cos();
+    }
+    else if is_key_down(KeyCode::D) {
+        camera.yaw -= turn_speed;
+        let radius = (camera.position - camera.target).norm();
+        camera.target.x = camera.position.x + radius * camera.yaw.sin();
+        camera.target.z = camera.position.z + radius * camera.yaw.cos();
+    }
+    else if is_key_down(KeyCode::W) {
+        let direction: Vector3<f32> = (camera.position - camera.target).normalize();
+        camera.position -= direction * move_speed;
+        camera.target -= direction * move_speed;
+    }
+    else if is_key_down(KeyCode::S) {
+        let direction: Vector3<f32> = (camera.position - camera.target).normalize();
+        camera.position += direction * move_speed;
+        camera.target += direction * move_speed;
+    }
+    camera.generate_view_mat()
 }
 
 #[macroquad::main("Renderer")]
 async fn main() {
-    let camera = Camera {
-        position: Point3::new(0.0, 0.0,-4.0), 
-        direction: Point3::new(0.0, 0.0, 0.0),
-        up: Vector3::new(0.0, 1.0, 0.0)
+    let mut camera = Camera {
+        position: Point3::new(0.0, 0.0,-5.0), 
+        target: Point3::new(0.0, 0.0, 0.0),
+        up: Vector3::new(0.0, 1.0, 0.0),
+        pitch: 0.0,
+        yaw: 0.0
     };
 
-    let light = Light { direction: Vector3::new(0.0, 1.0, 2.0), intensity: 1.0};
-    let view_mat: Matrix4<f32> = camera.generate_view_mat();
+    let light = Light { direction: Vector3::new(1.0, 0.0, 1.0), intensity: 1.0};
+    
     let proj_mat: Matrix4<f32> = *Perspective3::new(screen_width()/screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
     let mut models: Vec<Object> = Vec::new();
-    models.push(Object(Box::new(ConeMesh::new(2.0, 1.0)), 100.0, 50.0));
-    models.push(Object(Box::new(CubeMesh::new()), 200.0, 50.0));
-    models.push(Object(Box::new(ConeMesh::new(2.0, 1.0)), 300.0, 50.0));
-    models.push(Object(Box::new(CubeMesh::new()), 400.0, 50.0));
-    models.push(Object(Box::new(CubeMesh::new()), 500.0, 50.0));
-    models.push(Object(Box::new(CylinderMesh::new(3.0, 1.0)), 600.0, 50.0));
-    models.push(Object(Box::new(LetterNMesh::new()), 400.0, 200.0));
-    models.push(Object(Box::new(PHackMesh::new()), 400.0, 400.0));
+    models.push(
+        Object {
+            mesh: Box::new(PHackMesh::new()),
+            offset_x: 0.0,
+            offset_y: 0.0,
+            offset_z: 0.0
+        }
+    );
 
-    const SCALE: f32 = 50.0;
     let mut radians: f32 = 0.0;
 
     loop {
         clear_background(WHITE);
 
-        let mut zbuffer: Vec<f32> = Vec::new();
+        let view_mat: Matrix4<f32> = handle_keys(&mut camera, 0.1, 0.02);
 
         for mesh in models.iter() {
-            let model = &mesh.0;
+            let model = &mesh.mesh;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
+            let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
             let mut transformed_verts: Vec<Vector4<f32>> = Vec::new();
             let model_mat = Rotation3::from_axis_angle(&Vector3::x_axis(), radians).to_homogeneous()
                 * Rotation3::from_axis_angle(&Vector3::z_axis(), radians * 1.5).to_homogeneous();
@@ -79,31 +114,42 @@ async fn main() {
             for i in 0..model.verts().len() {
                 let vertex = model.verts()[i];
                 let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
-                zbuffer.push(persproj.z);
-                screen_verts.push(Point2::new(persproj.x / persproj.z, persproj.y / persproj.z));
+                let ndc_x = persproj.x / persproj.w;
+                let ndc_y = persproj.y / persproj.w;
+                let ndc_z = persproj.z / persproj.w;
+
+                if ndc_z < 0.0 || ndc_z > 1.0 {
+                    screen_verts.push(Point2::new(f32::NAN, f32::NAN));
+                } else {
+                    let screen_x = (ndc_x + 1.0) * 0.5 * screen_width();
+                    let screen_y = (1.0 - ndc_y) * 0.5 * screen_height();
+                    screen_verts.push(Point2::new(screen_x, screen_y));
+                }
+                zbuffer.push(view_mat * model_mat * Vector4::from(vertex));
                 transformed_verts.push(model_mat * Vector4::from(vertex));
             }
 
             let mut z_ordered_tris: Vec<(usize, usize, usize, Color, f32)> = model.tris().iter().map(
                 |tri| -> (usize, usize, usize, Color, f32) {
-                    let z = (transformed_verts[tri.0].z +
-                        transformed_verts[tri.1].z +
-                        transformed_verts[tri.2].z) / 3.0;
+                    let z = (zbuffer[tri.0].z +
+                        zbuffer[tri.1].z +
+                        zbuffer[tri.2].z) / 3.0;
                     (tri.0, tri.1, tri.2, tri.3, z)
                 }
             ).collect();
             z_ordered_tris.sort_by_key(
                 |tri| -> OrderedFloat<f32> {
-                    -OrderedFloat(tri.4)
+                    OrderedFloat(tri.4)
                 }
             );
 
-            let shift_x: f32 = mesh.1;
-            let shift_y: f32 = mesh.2;
             for tri in z_ordered_tris {
                 let s1 = screen_verts[tri.0];
                 let s2 = screen_verts[tri.1];
                 let s3 = screen_verts[tri.2];
+                if !s1.x.is_finite() || !s2.x.is_finite() || !s3.x.is_finite() {
+                    continue;
+                }
 
                 let v1: Vector4<f32> =  transformed_verts[tri.0];
                 let v2: Vector4<f32> =  transformed_verts[tri.1];
@@ -125,16 +171,16 @@ async fn main() {
                     a: tri.3.a
                 };
 
-                let t1 = Vec2 { x: SCALE * s1.x + shift_x, y: SCALE * s1.y + shift_y};
-                let t2 = Vec2 { x: SCALE * s2.x + shift_x, y: SCALE * s2.y + shift_y};
-                let t3 = Vec2 { x: SCALE * s3.x + shift_x, y: SCALE * s3.y + shift_y};
+                let t1 = Vec2 { x: s1.x, y: s1.y};
+                let t2 = Vec2 { x: s2.x, y: s2.y};
+                let t3 = Vec2 { x: s3.x, y: s3.y};
                 if is_front_facing(t1, t2, t3) {
                     draw_triangle( t1, t2, t3, color );
                 }
             }
         }
         
-        radians += 0.01;
+        radians += 0.00;
         next_frame().await;
     }
 }
