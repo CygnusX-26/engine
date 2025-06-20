@@ -84,13 +84,12 @@ async fn main() {
     let proj_mat: Matrix4<f32> =
         *Perspective3::new(screen_width() / screen_height(), 1.0, 0.1, 200.0).as_matrix();
 
-    let mut models: Vec<Object> = Vec::new();
-    models.push(Object {
+    let models: Vec<Object> = vec![Object {
         mesh: Box::new(PHackMesh::new()),
         offset_x: 0.0,
         offset_y: 0.0,
         offset_z: 0.0,
-    });
+    }];
 
     let mut radians: f32 = 0.0;
 
@@ -117,7 +116,7 @@ async fn main() {
                 let ndc_y = persproj.y / persproj.w;
                 let ndc_z = persproj.z / persproj.w;
 
-                if ndc_z < 0.0 || ndc_z > 1.0 {
+                if !(0.0..=1.0).contains(&ndc_z) {
                     screen_verts.push(Point2::new(f32::NAN, f32::NAN));
                 } else {
                     let screen_x = (ndc_x + 1.0) * 0.5 * screen_width();
@@ -158,7 +157,7 @@ async fn main() {
                 let vec2 = (v3 - v1).normalize();
                 let norm = vec1.cross(&vec2);
 
-                let brightness = norm.dot(&(light.direction.normalize())).max(0.0).min(1.0)
+                let brightness = norm.dot(&(light.direction.normalize())).clamp(0.0, 1.0)
                     * light.intensity
                     + light.ambient;
                 let color = Color {
