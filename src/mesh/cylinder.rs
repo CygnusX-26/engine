@@ -53,7 +53,7 @@ impl Mesh for CylinderMesh {
         &self.tris
     }
 
-    fn verts(&self) -> &Vec<Point3<f32>> {
+    fn verts(&self) -> &[Point3<f32>] {
         &self.verts
     }
 }
