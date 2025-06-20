@@ -141,6 +141,7 @@ async fn main() {
             object_depth(&camera, model_mat)
         });
 
+        // Iterate over meshes in sorted zbuffer order
         for (mesh, model_mat) in sorted_models.iter() {
             let model = &mesh.mesh;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
@@ -167,6 +168,7 @@ async fn main() {
                 transformed_verts.push(model_mat * Vector4::from(vertex));
             }
 
+            //Z order each triangle in each mesh
             let mut z_ordered_tris: Vec<(usize, usize, usize, Color, f32)> = model
                 .tris()
                 .iter()
@@ -177,6 +179,7 @@ async fn main() {
                 .collect();
             z_ordered_tris.sort_by_key(|tri| -> OrderedFloat<f32> { OrderedFloat(tri.4) });
 
+            // Draw the triangles
             for tri in z_ordered_tris {
                 let s1 = screen_verts[tri.0];
                 let s2 = screen_verts[tri.1];
