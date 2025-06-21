@@ -456,6 +456,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "engine"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "log",
+ "nalgebra",
+ "ordered-float",
+ "pixels",
+ "winit",
+ "winit_input_helper",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1567,19 +1580,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "tetrahedron"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "log",
- "nalgebra",
- "ordered-float",
- "pixels",
- "winit",
- "winit_input_helper",
 ]
 
 [[package]]

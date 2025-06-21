@@ -148,7 +148,9 @@ impl World {
                 let v2 = transformed_verts[tri.v2];
                 let v3 = transformed_verts[tri.v3];
 
-                let norm = (v2.xyz() - v1.xyz()).normalize().cross(&(v3.xyz() - v1.xyz()).normalize());
+                let norm = (v2.xyz() - v1.xyz())
+                    .normalize()
+                    .cross(&(v3.xyz() - v1.xyz()).normalize());
 
                 if is_front_facing(s1, s2, s3) {
                     self.draw_triangle(s1, s2, s3, &tri.color, frame, &norm);
@@ -164,21 +166,19 @@ impl World {
         t3: Point2<f32>,
         color: &Color,
         frame: &mut [u8],
-        norm: &Vector3<f32>
+        norm: &Vector3<f32>,
     ) {
         let light_dir = (self.light.target - self.light.position).normalize();
         let ambient = self.light.ambient;
         let diffuse = (light_dir.dot(norm) * self.light.intensity).clamp(0.0, 1.0);
         let specular = 0.0; //no fancy lighting for now its too laggy
         let coloring = ambient + diffuse + specular;
-        let colormap = |comp: u8, coloring: f32| -> u8{
-            ((comp as f32) * coloring) as u8
-        };
+        let colormap = |comp: u8, coloring: f32| -> u8 { ((comp as f32) * coloring) as u8 };
         let p_color = Color {
             r: colormap(color.r, coloring),
             g: colormap(color.g, coloring),
             b: colormap(color.b, coloring),
-            a: color.a
+            a: color.a,
         };
 
         let to_i32 = |p: Point2<f32>| (p.x as i32, p.y as i32);
@@ -203,11 +203,8 @@ impl World {
                 if w0 >= 0 && w1 >= 0 && w2 >= 0 {
                     let index = (y as u32 * WIDTH + x as u32) * 4;
                     if index as usize + 4 <= frame.len() {
-
                         frame[index as usize..index as usize + 4]
-                            .copy_from_slice(&[
-                                p_color.r, p_color.g, p_color.b, p_color.a
-                            ]);
+                            .copy_from_slice(&[p_color.r, p_color.g, p_color.b, p_color.a]);
                     }
                 }
             }
@@ -222,19 +219,21 @@ fn is_front_facing(p1: Point2<f32>, p2: Point2<f32>, p3: Point2<f32>) -> bool {
 }
 
 /// Handle key press turning and etc... TODO add mouse movement
-fn handle_keys(
-    input: &WinitInputHelper,
-    camera: &mut Camera,
-    move_speed: f32
-) -> Matrix4<f32> {
+fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -> Matrix4<f32> {
     if input.key_held(KeyCode::KeyA) {
-        let delta: Vector3<f32> = (camera.position - camera.target).normalize().cross(&camera.up) * move_speed;
+        let delta: Vector3<f32> = (camera.position - camera.target)
+            .normalize()
+            .cross(&camera.up)
+            * move_speed;
         camera.position.x += delta.x;
         camera.position.z += delta.z;
         camera.target.x += delta.x;
         camera.target.z += delta.z;
     } else if input.key_held(KeyCode::KeyD) {
-        let delta: Vector3<f32> = (camera.position - camera.target).normalize().cross(&camera.up) * move_speed;
+        let delta: Vector3<f32> = (camera.position - camera.target)
+            .normalize()
+            .cross(&camera.up)
+            * move_speed;
         camera.position.x -= delta.x;
         camera.position.z -= delta.z;
         camera.target.x -= delta.x;
@@ -262,7 +261,6 @@ fn object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> 
     OrderedFloat(object_pos.z)
 }
 
-
 fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32> {
     incident - (normal * (incident.dot(normal))).scale(2.0)
 }
@@ -281,7 +279,9 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
-    window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+    window
+        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+        .unwrap();
     window.set_cursor_visible(false);
 
     let mut pixels = {
@@ -351,8 +351,8 @@ fn main() -> Result<(), Error> {
 
             let (dx, dy) = input.mouse_diff();
             let sensitivity = 0.003;
-            world.camera.yaw -= dx as f32 * sensitivity;
-            world.camera.pitch -= dy as f32 * sensitivity;
+            world.camera.yaw -= dx * sensitivity;
+            world.camera.pitch -= dy * sensitivity;
 
             let max_pitch = std::f32::consts::FRAC_PI_2 - 0.01;
             world.camera.pitch = world.camera.pitch.clamp(-max_pitch, max_pitch);
