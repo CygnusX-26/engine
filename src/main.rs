@@ -181,26 +181,25 @@ impl World {
             a: color.a,
         };
 
-        let to_i32 = |p: Point2<f32>| (p.x as i32, p.y as i32);
-        let (x1, y1) = to_i32(t1);
-        let (x2, y2) = to_i32(t2);
-        let (x3, y3) = to_i32(t3);
-        let min_x = x1.min(x2).min(x3).max(0);
-        let max_x = x1.max(x2).max(x3).min(WIDTH as i32 - 1);
-        let min_y = y1.min(y2).min(y3).max(0);
-        let max_y = y1.max(y2).max(y3).min(HEIGHT as i32 - 1);
+        let (x1, y1) = (t1.x, t1.y);
+        let (x2, y2) = (t2.x, t2.y);
+        let (x3, y3) = (t3.x, t3.y);
+        let min_x = (x1.min(x2).min(x3).max(0.0)) as i32;
+        let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as i32;
+        let min_y = (y1.min(y2).min(y3).max(0.0)) as i32;
+        let max_y = (y1.max(y2).max(y3).min(HEIGHT as f32 - 1.0) + 1.0) as i32;
 
-        let edge = |(ax, ay): (i32, i32), (bx, by): (i32, i32), (px, py): (i32, i32)| -> i32 {
+        let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
             (py - ay) * (bx - ax) - (px - ax) * (by - ay)
         };
         for y in min_y..=max_y {
             for x in min_x..=max_x {
-                let p = (x, y);
+                let p = (x as f32 , y as f32);
                 let w0 = edge((x2, y2), (x3, y3), p);
                 let w1 = edge((x3, y3), (x1, y1), p);
                 let w2 = edge((x1, y1), (x2, y2), p);
 
-                if w0 >= 0 && w1 >= 0 && w2 >= 0 {
+                if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
                     let index = (y as u32 * WIDTH + x as u32) * 4;
                     if index as usize + 4 <= frame.len() {
                         frame[index as usize..index as usize + 4]
