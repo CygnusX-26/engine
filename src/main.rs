@@ -2,8 +2,8 @@ mod mesh;
 
 use macroquad::prelude::*;
 use mesh::Mesh as MyMesh;
-use mesh::p_hack::PHackMesh;
 use mesh::Triangle;
+use mesh::p_hack::PHackMesh;
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 

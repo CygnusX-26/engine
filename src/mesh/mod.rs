@@ -3,7 +3,7 @@ pub mod cube;
 pub mod cylinder;
 pub mod letter_n;
 pub mod p_hack;
-pub mod tall_wall;
+pub mod wall;
 
 use macroquad::color::Color;
 use nalgebra::Point3;
@@ -13,7 +13,7 @@ pub struct Triangle {
     pub v1: usize,
     pub v2: usize,
     pub v3: usize,
-    pub color: Color
+    pub color: Color,
 }
 
 pub trait Mesh {
