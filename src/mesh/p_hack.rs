@@ -1,11 +1,11 @@
-use crate::mesh::Mesh;
-use macroquad::color::{Color, PURPLE, YELLOW};
+use crate::mesh::{Mesh, Triangle};
+use macroquad::color::{PURPLE, YELLOW};
 use nalgebra::Point3;
 
 #[derive(Debug)]
 pub struct PHackMesh {
     verts: Vec<Point3<f32>>,
-    tris: Vec<(usize, usize, usize, Color)>,
+    tris: Vec<Triangle>,
 }
 
 impl PHackMesh {
@@ -36,49 +36,51 @@ impl PHackMesh {
                 Point3::new(-0.5, -1.5, 0.5),
             ],
             tris: vec![
-                (0, 4, 1, YELLOW),
-                (4, 0, 2, YELLOW),
-                (3, 6, 5, YELLOW),
-                (6, 3, 7, YELLOW),
-                (9, 2, 8, YELLOW),
-                (2, 9, 10, YELLOW),
-                (11, 12, 15, YELLOW),
-                (15, 13, 11, YELLOW),
-                (14, 16, 17, YELLOW),
-                (17, 18, 14, YELLOW),
-                (20, 19, 13, YELLOW),
-                (13, 21, 20, YELLOW),
-                (13, 2, 0, PURPLE),
-                (0, 11, 13, PURPLE),
-                (20, 9, 8, PURPLE),
-                (8, 19, 20, PURPLE),
-                (18, 7, 4, PURPLE),
-                (4, 15, 18, PURPLE),
-                (1, 3, 12, PURPLE),
-                (14, 12, 3, PURPLE),
-                (5, 6, 16, PURPLE),
-                (17, 16, 6, PURPLE),
-                (2, 10, 13, PURPLE),
-                (21, 13, 10, PURPLE),
-                (0, 1, 12, PURPLE),
-                (12, 11, 0, PURPLE),
-                (8, 2, 13, PURPLE),
-                (13, 19, 8, PURPLE),
-                (3, 5, 16, PURPLE),
-                (16, 14, 3, PURPLE),
-                (10, 9, 21, PURPLE),
-                (20, 21, 9, PURPLE),
-                (4, 2, 15, PURPLE),
-                (13, 15, 2, PURPLE),
-                (6, 7, 17, PURPLE),
-                (18, 17, 7, PURPLE),
+                Triangle { v1: 0, v2: 4, v3: 1, color: YELLOW },
+                Triangle { v1: 4, v2: 0, v3: 2, color: YELLOW },
+                Triangle { v1: 3, v2: 6, v3: 5, color: YELLOW },
+                Triangle { v1: 6, v2: 3, v3: 7, color: YELLOW },
+                Triangle { v1: 9, v2: 2, v3: 8, color: YELLOW },
+                Triangle { v1: 2, v2: 9, v3: 10, color: YELLOW },
+                Triangle { v1: 11, v2: 12, v3: 15, color: YELLOW },
+                Triangle { v1: 15, v2: 13, v3: 11, color: YELLOW },
+                Triangle { v1: 14, v2: 16, v3: 17, color: YELLOW },
+                Triangle { v1: 17, v2: 18, v3: 14, color: YELLOW },
+                Triangle { v1: 20, v2: 19, v3: 13, color: YELLOW },
+                Triangle { v1: 13, v2: 21, v3: 20, color: YELLOW },
+                
+                Triangle { v1: 13, v2: 2, v3: 0, color: PURPLE },
+                Triangle { v1: 0, v2: 11, v3: 13, color: PURPLE },
+                Triangle { v1: 20, v2: 9, v3: 8, color: PURPLE },
+                Triangle { v1: 8, v2: 19, v3: 20, color: PURPLE },
+                Triangle { v1: 18, v2: 7, v3: 4, color: PURPLE },
+                Triangle { v1: 4, v2: 15, v3: 18, color: PURPLE },
+                Triangle { v1: 1, v2: 3, v3: 12, color: PURPLE },
+                Triangle { v1: 14, v2: 12, v3: 3, color: PURPLE },
+                Triangle { v1: 5, v2: 6, v3: 16, color: PURPLE },
+                Triangle { v1: 17, v2: 16, v3: 6, color: PURPLE },
+                Triangle { v1: 2, v2: 10, v3: 13, color: PURPLE },
+                Triangle { v1: 21, v2: 13, v3: 10, color: PURPLE },
+                Triangle { v1: 0, v2: 1, v3: 12, color: PURPLE },
+                Triangle { v1: 12, v2: 11, v3: 0, color: PURPLE },
+                Triangle { v1: 8, v2: 2, v3: 13, color: PURPLE },
+                Triangle { v1: 13, v2: 19, v3: 8, color: PURPLE },
+                Triangle { v1: 3, v2: 5, v3: 16, color: PURPLE },
+                Triangle { v1: 16, v2: 14, v3: 3, color: PURPLE },
+                Triangle { v1: 10, v2: 9, v3: 21, color: PURPLE },
+                Triangle { v1: 20, v2: 21, v3: 9, color: PURPLE },
+                Triangle { v1: 4, v2: 2, v3: 15, color: PURPLE },
+                Triangle { v1: 13, v2: 15, v3: 2, color: PURPLE },
+                Triangle { v1: 6, v2: 7, v3: 17, color: PURPLE },
+                Triangle { v1: 18, v2: 17, v3: 7, color: PURPLE },
             ],
+
         }
     }
 }
 
 impl Mesh for PHackMesh {
-    fn tris(&self) -> &Vec<(usize, usize, usize, Color)> {
+    fn tris(&self) -> &Vec<Triangle> {
         &self.tris
     }
 

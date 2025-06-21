@@ -1,6 +1,6 @@
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, Triangle};
 use macroquad::color::{
-    BEIGE, BLUE, Color, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, SKYBLUE,
+    BEIGE, BLUE, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, SKYBLUE,
     YELLOW,
 };
 use nalgebra::Point3;
@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 #[derive(Debug)]
 pub struct ConeMesh {
     verts: Vec<Point3<f32>>,
-    tris: Vec<(usize, usize, usize, Color)>,
+    tris: Vec<Triangle>,
 }
 
 impl ConeMesh {
@@ -31,37 +31,38 @@ impl ConeMesh {
         Self {
             verts,
             tris: vec![
-                (0, 1, 12, RED),
-                (1, 2, 12, ORANGE),
-                (2, 3, 12, YELLOW),
-                (3, 4, 12, GREEN),
-                (4, 5, 12, BLUE),
-                (5, 6, 12, PURPLE),
-                (6, 7, 12, PINK),
-                (7, 8, 12, LIME),
-                (8, 9, 12, GOLD),
-                (9, 10, 12, BEIGE),
-                (10, 11, 12, GRAY),
-                (11, 0, 12, DARKBLUE),
-                (0, 13, 1, SKYBLUE),
-                (1, 13, 2, RED),
-                (2, 13, 3, SKYBLUE),
-                (3, 13, 4, RED),
-                (4, 13, 5, SKYBLUE),
-                (5, 13, 6, RED),
-                (6, 13, 7, SKYBLUE),
-                (7, 13, 8, RED),
-                (8, 13, 9, SKYBLUE),
-                (9, 13, 10, RED),
-                (10, 13, 11, SKYBLUE),
-                (11, 13, 0, RED),
+                Triangle { v1: 0,  v2: 1,  v3: 12, color: RED },
+                Triangle { v1: 1,  v2: 2,  v3: 12, color: ORANGE },
+                Triangle { v1: 2,  v2: 3,  v3: 12, color: YELLOW },
+                Triangle { v1: 3,  v2: 4,  v3: 12, color: GREEN },
+                Triangle { v1: 4,  v2: 5,  v3: 12, color: BLUE },
+                Triangle { v1: 5,  v2: 6,  v3: 12, color: PURPLE },
+                Triangle { v1: 6,  v2: 7,  v3: 12, color: PINK },
+                Triangle { v1: 7,  v2: 8,  v3: 12, color: LIME },
+                Triangle { v1: 8,  v2: 9,  v3: 12, color: GOLD },
+                Triangle { v1: 9,  v2: 10, v3: 12, color: BEIGE },
+                Triangle { v1: 10, v2: 11, v3: 12, color: GRAY },
+                Triangle { v1: 11, v2: 0,  v3: 12, color: DARKBLUE },
+
+                Triangle { v1: 0,  v2: 13, v3: 1,  color: SKYBLUE },
+                Triangle { v1: 1,  v2: 13, v3: 2,  color: RED },
+                Triangle { v1: 2,  v2: 13, v3: 3,  color: SKYBLUE },
+                Triangle { v1: 3,  v2: 13, v3: 4,  color: RED },
+                Triangle { v1: 4,  v2: 13, v3: 5,  color: SKYBLUE },
+                Triangle { v1: 5,  v2: 13, v3: 6,  color: RED },
+                Triangle { v1: 6,  v2: 13, v3: 7,  color: SKYBLUE },
+                Triangle { v1: 7,  v2: 13, v3: 8,  color: RED },
+                Triangle { v1: 8,  v2: 13, v3: 9,  color: SKYBLUE },
+                Triangle { v1: 9,  v2: 13, v3: 10, color: RED },
+                Triangle { v1: 10, v2: 13, v3: 11, color: SKYBLUE },
+                Triangle { v1: 11, v2: 13, v3: 0,  color: RED },
             ],
         }
     }
 }
 
 impl Mesh for ConeMesh {
-    fn tris(&self) -> &Vec<(usize, usize, usize, Color)> {
+    fn tris(&self) -> &Vec<Triangle> {
         &self.tris
     }
 

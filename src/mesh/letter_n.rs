@@ -1,11 +1,12 @@
-use crate::mesh::Mesh;
-use macroquad::color::{BLUE, Color, GOLD, GREEN, PINK, PURPLE, RED};
+use crate::mesh::{Mesh, Triangle};
+use macroquad::color::{BLUE, GOLD, GREEN, PINK, PURPLE, RED};
 use nalgebra::Point3;
+
 
 #[derive(Debug)]
 pub struct LetterNMesh {
     verts: Vec<Point3<f32>>,
-    tris: Vec<(usize, usize, usize, Color)>,
+    tris: Vec<Triangle>,
 }
 
 impl LetterNMesh {
@@ -34,45 +35,45 @@ impl LetterNMesh {
                 Point3::new(1.0, -1.0, 0.0),
             ],
             tris: vec![
-                (0, 2, 1, RED),
-                (1, 2, 3, RED),
-                (8, 6, 7, RED),
-                (7, 6, 5, RED),
-                (8, 9, 4, RED),
-                (3, 4, 9, RED),
-                (10, 11, 12, BLUE),
-                (11, 13, 12, BLUE),
-                (18, 17, 16, BLUE),
-                (15, 16, 17, BLUE),
-                (18, 14, 19, BLUE),
-                (13, 19, 14, BLUE),
-                (0, 11, 10, GREEN),
-                (11, 0, 1, GREEN),
-                (6, 15, 5, GREEN),
-                (15, 6, 16, GREEN),
-                (4, 2, 14, PURPLE),
-                (2, 12, 14, PURPLE),
-                (7, 17, 9, PURPLE),
-                (9, 17, 19, PURPLE),
-                (4, 14, 8, PINK),
-                (8, 14, 18, PINK),
-                (3, 9, 13, PINK),
-                (19, 13, 9, PINK),
-                (1, 3, 13, GOLD),
-                (1, 13, 11, GOLD),
-                (7, 5, 15, GOLD),
-                (7, 15, 17, GOLD),
-                (0, 12, 2, GOLD),
-                (0, 10, 12, GOLD),
-                (8, 16, 6, GOLD),
-                (8, 18, 16, GOLD), // TODO later
+                Triangle { v1: 0,  v2: 2,  v3: 1,  color: RED },
+                Triangle { v1: 1,  v2: 2,  v3: 3,  color: RED },
+                Triangle { v1: 8,  v2: 6,  v3: 7,  color: RED },
+                Triangle { v1: 7,  v2: 6,  v3: 5,  color: RED },
+                Triangle { v1: 8,  v2: 9,  v3: 4,  color: RED },
+                Triangle { v1: 3,  v2: 4,  v3: 9,  color: RED },
+                Triangle { v1: 10, v2: 11, v3: 12, color: BLUE },
+                Triangle { v1: 11, v2: 13, v3: 12, color: BLUE },
+                Triangle { v1: 18, v2: 17, v3: 16, color: BLUE },
+                Triangle { v1: 15, v2: 16, v3: 17, color: BLUE },
+                Triangle { v1: 18, v2: 14, v3: 19, color: BLUE },
+                Triangle { v1: 13, v2: 19, v3: 14, color: BLUE },
+                Triangle { v1: 0,  v2: 11, v3: 10, color: GREEN },
+                Triangle { v1: 11, v2: 0,  v3: 1,  color: GREEN },
+                Triangle { v1: 6,  v2: 15, v3: 5,  color: GREEN },
+                Triangle { v1: 15, v2: 6,  v3: 16, color: GREEN },
+                Triangle { v1: 4,  v2: 2,  v3: 14, color: PURPLE },
+                Triangle { v1: 2,  v2: 12, v3: 14, color: PURPLE },
+                Triangle { v1: 7,  v2: 17, v3: 9,  color: PURPLE },
+                Triangle { v1: 9,  v2: 17, v3: 19, color: PURPLE },
+                Triangle { v1: 4,  v2: 14, v3: 8,  color: PINK },
+                Triangle { v1: 8,  v2: 14, v3: 18, color: PINK },
+                Triangle { v1: 3,  v2: 9,  v3: 13, color: PINK },
+                Triangle { v1: 19, v2: 13, v3: 9,  color: PINK },
+                Triangle { v1: 1,  v2: 3,  v3: 13, color: GOLD },
+                Triangle { v1: 1,  v2: 13, v3: 11, color: GOLD },
+                Triangle { v1: 7,  v2: 5,  v3: 15, color: GOLD },
+                Triangle { v1: 7,  v2: 15, v3: 17, color: GOLD },
+                Triangle { v1: 0,  v2: 12, v3: 2,  color: GOLD },
+                Triangle { v1: 0,  v2: 10, v3: 12, color: GOLD },
+                Triangle { v1: 8,  v2: 16, v3: 6,  color: GOLD },
+                Triangle { v1: 8,  v2: 18, v3: 16, color: GOLD },
             ],
         }
     }
 }
 
 impl Mesh for LetterNMesh {
-    fn tris(&self) -> &Vec<(usize, usize, usize, Color)> {
+    fn tris(&self) -> &Vec<Triangle> {
         &self.tris
     }
 

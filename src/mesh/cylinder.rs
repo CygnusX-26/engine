@@ -1,12 +1,12 @@
-use crate::mesh::Mesh;
-use macroquad::color::{BLUE, Color, GREEN, ORANGE, RED};
+use crate::mesh::{Mesh, Triangle};
+use macroquad::color::{BLUE, GREEN, ORANGE, RED};
 use nalgebra::Point3;
 use std::f32::consts::PI;
 
 #[derive(Debug)]
 pub struct CylinderMesh {
     verts: Vec<Point3<f32>>,
-    tris: Vec<(usize, usize, usize, Color)>,
+    tris: Vec<Triangle>,
 }
 
 impl CylinderMesh {
@@ -32,20 +32,45 @@ impl CylinderMesh {
         verts.push(Point3::new(0.0, offset, 0.0));
         verts.push(Point3::new(0.0, height + offset, 0.0));
 
-        let mut tris: Vec<(usize, usize, usize, Color)> = Vec::new();
+        let mut tris: Vec<Triangle> = Vec::new();
         for i in 0..12 {
             let next = (i + 1) % 12;
-            tris.push((i, next, i + 12, RED));
-            tris.push((next + 12, i + 12, next, ORANGE));
-            tris.push((next, i, 24, BLUE));
-            tris.push((i + 12, next + 12, 25, GREEN));
+
+            tris.push(Triangle {
+                v1: i,
+                v2: next,
+                v3: i + 12,
+                color: RED,
+            });
+
+            tris.push(Triangle {
+                v1: i + 12,
+                v2: next,
+                v3: next + 12,
+                color: ORANGE,
+            });
+
+            tris.push(Triangle {
+                v1: next,
+                v2: i,
+                v3: 24,
+                color: BLUE,
+            });
+
+            tris.push(Triangle {
+                v1: i + 12,
+                v2: next + 12,
+                v3: 25,
+                color: GREEN,
+            });
         }
+
         Self { verts, tris }
     }
 }
 
 impl Mesh for CylinderMesh {
-    fn tris(&self) -> &Vec<(usize, usize, usize, Color)> {
+    fn tris(&self) -> &Vec<Triangle> {
         &self.tris
     }
 

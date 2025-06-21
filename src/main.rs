@@ -3,7 +3,7 @@ mod mesh;
 use macroquad::prelude::*;
 use mesh::Mesh as MyMesh;
 use mesh::p_hack::PHackMesh;
-use mesh::tall_wall::TallWallMesh;
+use mesh::Triangle;
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 
@@ -88,7 +88,7 @@ async fn main() {
     };
 
     let proj_mat: Matrix4<f32> =
-        *Perspective3::new(screen_width() / screen_height(), 1.0, 0.1, 200.0).as_matrix();
+        Perspective3::new(screen_width() / screen_height(), 1.0, 0.1, 200.0).to_homogeneous();
 
     let models: Vec<Object> = vec![
         Object {
@@ -142,7 +142,7 @@ async fn main() {
         });
 
         // Iterate over meshes in sorted zbuffer order
-        for (mesh, model_mat) in sorted_models.iter() {
+        for (mesh, model_mat) in &sorted_models {
             let model = &mesh.mesh;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
@@ -150,8 +150,7 @@ async fn main() {
 
             let proj = proj_mat * view_mat * model_mat;
 
-            for i in 0..model.verts().len() {
-                let vertex = model.verts()[i];
+            for vertex in model.verts().iter().copied() {
                 let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
@@ -169,28 +168,28 @@ async fn main() {
             }
 
             //Z order each triangle in each mesh
-            let mut z_ordered_tris: Vec<(usize, usize, usize, Color, f32)> = model
+            let mut z_ordered_tris: Vec<(&Triangle, f32)> = model
                 .tris()
                 .iter()
-                .map(|tri| -> (usize, usize, usize, Color, f32) {
-                    let z = (zbuffer[tri.0].z + zbuffer[tri.1].z + zbuffer[tri.2].z) / 3.0;
-                    (tri.0, tri.1, tri.2, tri.3, z)
+                .map(|tri| -> (&Triangle, f32) {
+                    let z = (zbuffer[tri.v1].z + zbuffer[tri.v2].z + zbuffer[tri.v3].z) / 3.0;
+                    (tri, z)
                 })
                 .collect();
-            z_ordered_tris.sort_by_key(|tri| -> OrderedFloat<f32> { OrderedFloat(tri.4) });
+            z_ordered_tris.sort_by_key(|tri| -> OrderedFloat<f32> { OrderedFloat(tri.1) });
 
             // Draw the triangles
             for tri in z_ordered_tris {
-                let s1 = screen_verts[tri.0];
-                let s2 = screen_verts[tri.1];
-                let s3 = screen_verts[tri.2];
+                let s1 = screen_verts[tri.0.v1];
+                let s2 = screen_verts[tri.0.v2];
+                let s3 = screen_verts[tri.0.v3];
                 if !s1.x.is_finite() || !s2.x.is_finite() || !s3.x.is_finite() {
                     continue;
                 }
 
-                let v1: Vector4<f32> = transformed_verts[tri.0];
-                let v2: Vector4<f32> = transformed_verts[tri.1];
-                let v3: Vector4<f32> = transformed_verts[tri.2];
+                let v1 = transformed_verts[tri.0.v1];
+                let v2 = transformed_verts[tri.0.v2];
+                let v3 = transformed_verts[tri.0.v3];
 
                 let v1 = Vector3::new(v1.x, v1.y, v1.z);
                 let v2 = Vector3::new(v2.x, v2.y, v2.z);
@@ -204,10 +203,10 @@ async fn main() {
                     * light.intensity
                     + light.ambient;
                 let color = Color {
-                    r: tri.3.r * brightness,
-                    g: tri.3.g * brightness,
-                    b: tri.3.b * brightness,
-                    a: tri.3.a,
+                    r: tri.0.color.r * brightness,
+                    g: tri.0.color.g * brightness,
+                    b: tri.0.color.b * brightness,
+                    a: tri.0.color.a,
                 };
 
                 let t1 = Vec2 { x: s1.x, y: s1.y };

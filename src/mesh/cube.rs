@@ -1,13 +1,13 @@
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, Triangle};
 use macroquad::color::{
-    BEIGE, BLUE, Color, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, YELLOW,
+    BEIGE, BLUE, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, YELLOW,
 };
 use nalgebra::Point3;
 
 #[derive(Debug)]
 pub struct CubeMesh {
     verts: Vec<Point3<f32>>,
-    tris: Vec<(usize, usize, usize, Color)>,
+    tris: Vec<Triangle>,
 }
 
 impl CubeMesh {
@@ -24,25 +24,25 @@ impl CubeMesh {
                 Point3::new(-1.0, 1.0, 1.0),
             ],
             tris: vec![
-                (0, 1, 2, RED),
-                (0, 2, 3, GREEN),
-                (4, 6, 5, BLUE),
-                (4, 7, 6, ORANGE),
-                (0, 3, 7, PINK),
-                (0, 7, 4, DARKBLUE),
-                (1, 5, 6, LIME),
-                (1, 6, 2, PURPLE),
-                (0, 4, 5, BEIGE),
-                (0, 5, 1, GOLD),
-                (3, 2, 6, GRAY),
-                (3, 6, 7, YELLOW),
+                Triangle { v1: 0, v2: 1, v3: 2, color: RED },
+                Triangle { v1: 0, v2: 2, v3: 3, color: GREEN },
+                Triangle { v1: 4, v2: 6, v3: 5, color: BLUE },
+                Triangle { v1: 4, v2: 7, v3: 6, color: ORANGE },
+                Triangle { v1: 0, v2: 3, v3: 7, color: PINK },
+                Triangle { v1: 0, v2: 7, v3: 4, color: DARKBLUE },
+                Triangle { v1: 1, v2: 5, v3: 6, color: LIME },
+                Triangle { v1: 1, v2: 6, v3: 2, color: PURPLE },
+                Triangle { v1: 0, v2: 4, v3: 5, color: BEIGE },
+                Triangle { v1: 0, v2: 5, v3: 1, color: GOLD },
+                Triangle { v1: 3, v2: 2, v3: 6, color: GRAY },
+                Triangle { v1: 3, v2: 6, v3: 7, color: YELLOW },
             ],
         }
     }
 }
 
 impl Mesh for CubeMesh {
-    fn tris(&self) -> &Vec<(usize, usize, usize, Color)> {
+    fn tris(&self) -> &Vec<Triangle> {
         &self.tris
     }
 
