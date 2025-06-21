@@ -1,19 +1,19 @@
 mod mesh;
 
+use mesh::p_hack::PHackMesh;
+use mesh::Color;
 use mesh::Mesh as MyMesh;
 use mesh::Triangle;
-use mesh::Color;
-use mesh::p_hack::PHackMesh;
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 
+use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
-use log::error;
 use winit_input_helper::WinitInputHelper;
 
 const WIDTH: u32 = 500;
@@ -35,7 +35,8 @@ pub struct Camera {
 }
 
 pub struct Light {
-    pub direction: Vector3<f32>,
+    pub position: Point3<f32>,
+    pub target: Point3<f32>,
     pub intensity: f32,
     pub ambient: f32,
 }
@@ -44,7 +45,7 @@ pub struct World {
     pub camera: Camera,
     pub light: Light,
     pub models: Vec<Object>,
-    pub proj_mat: Matrix4<f32>
+    pub proj_mat: Matrix4<f32>,
 }
 
 impl Camera {
@@ -59,13 +60,14 @@ impl World {
             camera,
             light,
             models,
-            proj_mat
+            proj_mat,
         }
     }
 
     pub fn draw(&mut self, view_mat: Matrix4<f32>, frame: &mut [u8]) {
         frame.fill(255);
-        let mut sorted_models: Vec<(&Object, Matrix4<f32>)> = self.models
+        let mut sorted_models: Vec<(&Object, Matrix4<f32>)> = self
+            .models
             .iter()
             .map(|model| -> (&Object, Matrix4<f32>) {
                 (
@@ -134,44 +136,51 @@ impl World {
             z_ordered_tris.sort_by_key(|tri| -> OrderedFloat<f32> { OrderedFloat(tri.1) });
 
             // Draw the triangles
-            for tri in z_ordered_tris {
-                let s1 = screen_verts[tri.0.v1];
-                let s2 = screen_verts[tri.0.v2];
-                let s3 = screen_verts[tri.0.v3];
+            for (tri, _) in z_ordered_tris {
+                let s1 = screen_verts[tri.v1];
+                let s2 = screen_verts[tri.v2];
+                let s3 = screen_verts[tri.v3];
                 if !s1.x.is_finite() || !s2.x.is_finite() || !s3.x.is_finite() {
                     continue;
                 }
 
-                let v1 = transformed_verts[tri.0.v1];
-                let v2 = transformed_verts[tri.0.v2];
-                let v3 = transformed_verts[tri.0.v3];
+                let v1 = transformed_verts[tri.v1];
+                let v2 = transformed_verts[tri.v2];
+                let v3 = transformed_verts[tri.v3];
 
-                let v1 = Vector3::new(v1.x, v1.y, v1.z);
-                let v2 = Vector3::new(v2.x, v2.y, v2.z);
-                let v3 = Vector3::new(v3.x, v3.y, v3.z);
-
-                let vec1 = (v2 - v1).normalize();
-                let vec2 = (v3 - v1).normalize();
-                let norm = vec1.cross(&vec2);
-
-                let brightness = norm.dot(&(self.light.direction.normalize())).clamp(0.0, 1.0)
-                    * self.light.intensity
-                    + self.light.ambient;
-                let color = Color {
-                    r: ((tri.0.color.r as f32) * brightness) as u8,
-                    g: ((tri.0.color.g as f32) * brightness) as u8,
-                    b: ((tri.0.color.b as f32) * brightness) as u8,
-                    a: tri.0.color.a,
-                };
+                let norm = (v2.xyz() - v1.xyz()).normalize().cross(&(v3.xyz() - v1.xyz()).normalize());
 
                 if is_front_facing(s1, s2, s3) {
-                    self.draw_triangle(s1, s2, s3, color, frame);
+                    self.draw_triangle(s1, s2, s3, &tri.color, frame, &norm);
                 }
             }
         }
     }
 
-    fn draw_triangle(&self, t1: Point2<f32>, t2: Point2<f32>, t3: Point2<f32>, color: Color, frame: &mut [u8]) {
+    fn draw_triangle(
+        &self,
+        t1: Point2<f32>,
+        t2: Point2<f32>,
+        t3: Point2<f32>,
+        color: &Color,
+        frame: &mut [u8],
+        norm: &Vector3<f32>
+    ) {
+        let light_dir = (self.light.target - self.light.position).normalize();
+        let ambient = self.light.ambient;
+        let diffuse = (light_dir.dot(norm) * self.light.intensity).clamp(0.0, 1.0);
+        let specular = 0.0; //no fancy lighting for now its too laggy
+        let coloring = ambient + diffuse + specular;
+        let colormap = |comp: u8, coloring: f32| -> u8{
+            ((comp as f32) * coloring) as u8
+        };
+        let p_color = Color {
+            r: colormap(color.r, coloring),
+            g: colormap(color.g, coloring),
+            b: colormap(color.b, coloring),
+            a: color.a
+        };
+
         let to_i32 = |p: Point2<f32>| (p.x as i32, p.y as i32);
         let (x1, y1) = to_i32(t1);
         let (x2, y2) = to_i32(t2);
@@ -182,20 +191,23 @@ impl World {
         let max_y = y1.max(y2).max(y3).min(HEIGHT as i32 - 1);
 
         let edge = |(ax, ay): (i32, i32), (bx, by): (i32, i32), (px, py): (i32, i32)| -> i32 {
-            (px - ax) * (by - ay) - (py - ay) * (bx - ax)
+            (py - ay) * (bx - ax) - (px - ax) * (by - ay)
         };
         for y in min_y..=max_y {
             for x in min_x..=max_x {
                 let p = (x, y);
-                let w0 = -edge((x2, y2), (x3, y3), p);
-                let w1 = -edge((x3, y3), (x1, y1), p);
-                let w2 = -edge((x1, y1), (x2, y2), p);
+                let w0 = edge((x2, y2), (x3, y3), p);
+                let w1 = edge((x3, y3), (x1, y1), p);
+                let w2 = edge((x1, y1), (x2, y2), p);
 
                 if w0 >= 0 && w1 >= 0 && w2 >= 0 {
                     let index = (y as u32 * WIDTH + x as u32) * 4;
                     if index as usize + 4 <= frame.len() {
+
                         frame[index as usize..index as usize + 4]
-                            .copy_from_slice(&[color.r, color.g, color.b, 255]);
+                            .copy_from_slice(&[
+                                p_color.r, p_color.g, p_color.b, p_color.a
+                            ]);
                     }
                 }
             }
@@ -210,25 +222,35 @@ fn is_front_facing(p1: Point2<f32>, p2: Point2<f32>, p3: Point2<f32>) -> bool {
 }
 
 /// Handle key press turning and etc... TODO add mouse movement
-fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32, turn_speed: f32) -> Matrix4<f32> {
+fn handle_keys(
+    input: &WinitInputHelper,
+    camera: &mut Camera,
+    move_speed: f32
+) -> Matrix4<f32> {
     if input.key_held(KeyCode::KeyA) {
-        camera.yaw += turn_speed;
-        let radius = (camera.position - camera.target).norm();
-        camera.target.x = camera.position.x + radius * camera.yaw.sin();
-        camera.target.z = camera.position.z + radius * camera.yaw.cos();
+        let delta: Vector3<f32> = (camera.position - camera.target).normalize().cross(&camera.up) * move_speed;
+        camera.position.x += delta.x;
+        camera.position.z += delta.z;
+        camera.target.x += delta.x;
+        camera.target.z += delta.z;
     } else if input.key_held(KeyCode::KeyD) {
-        camera.yaw -= turn_speed;
-        let radius = (camera.position - camera.target).norm();
-        camera.target.x = camera.position.x + radius * camera.yaw.sin();
-        camera.target.z = camera.position.z + radius * camera.yaw.cos();
+        let delta: Vector3<f32> = (camera.position - camera.target).normalize().cross(&camera.up) * move_speed;
+        camera.position.x -= delta.x;
+        camera.position.z -= delta.z;
+        camera.target.x -= delta.x;
+        camera.target.z -= delta.z;
     } else if input.key_held(KeyCode::KeyW) {
-        let direction: Vector3<f32> = (camera.position - camera.target).normalize();
-        camera.position -= direction * move_speed;
-        camera.target -= direction * move_speed;
+        let delta: Vector3<f32> = (camera.position - camera.target).normalize() * move_speed;
+        camera.position.x -= delta.x;
+        camera.position.z -= delta.z;
+        camera.target.x -= delta.x;
+        camera.target.z -= delta.z;
     } else if input.key_held(KeyCode::KeyS) {
-        let direction: Vector3<f32> = (camera.position - camera.target).normalize();
-        camera.position += direction * move_speed;
-        camera.target += direction * move_speed;
+        let delta: Vector3<f32> = (camera.position - camera.target).normalize() * move_speed;
+        camera.position.x += delta.x;
+        camera.position.z += delta.z;
+        camera.target.x += delta.x;
+        camera.target.z += delta.z;
     }
     camera.generate_view_mat()
 }
@@ -238,6 +260,11 @@ fn object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> 
     let view_model = view_mat * model_mat;
     let object_pos = view_model.transform_point(&Point3::origin());
     OrderedFloat(object_pos.z)
+}
+
+
+fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32> {
+    incident - (normal * (incident.dot(normal))).scale(2.0)
 }
 
 fn main() -> Result<(), Error> {
@@ -254,6 +281,9 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
+    window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+    window.set_cursor_visible(false);
+
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
@@ -269,9 +299,10 @@ fn main() -> Result<(), Error> {
             yaw: 0.0,
         },
         Light {
-            direction: Vector3::new(1.0, 0.0, 1.0),
+            position: Point3::new(-1.0, 1.0, -1.0),
+            target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
-            ambient: 0.2,
+            ambient: 0.3,
         },
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.1, 200.0).to_homogeneous(),
         vec![
@@ -287,11 +318,11 @@ fn main() -> Result<(), Error> {
                 offset_y: 0.0,
                 offset_z: 3.0,
             },
-        ]
+        ],
     );
 
     let res = event_loop.run(|event, elwt| {
-        let mut view_mat: Matrix4<f32> = world.camera.generate_view_mat();
+        let view_mat: Matrix4<f32> = world.camera.generate_view_mat();
         if let Event::WindowEvent {
             event: WindowEvent::RedrawRequested,
             ..
@@ -318,7 +349,22 @@ fn main() -> Result<(), Error> {
                 }
             }
 
-            view_mat = handle_keys(&input, &mut world.camera, 0.1, 0.02);
+            let (dx, dy) = input.mouse_diff();
+            let sensitivity = 0.003;
+            world.camera.yaw -= dx as f32 * sensitivity;
+            world.camera.pitch -= dy as f32 * sensitivity;
+
+            let max_pitch = std::f32::consts::FRAC_PI_2 - 0.01;
+            world.camera.pitch = world.camera.pitch.clamp(-max_pitch, max_pitch);
+
+            let radius = (world.camera.position - world.camera.target).norm();
+            let yaw = world.camera.yaw;
+            let pitch = world.camera.pitch;
+
+            world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
+            world.camera.target.y = world.camera.position.y + radius * pitch.sin();
+            world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
+            handle_keys(&input, &mut world.camera, 0.1);
             window.request_redraw();
         }
     });

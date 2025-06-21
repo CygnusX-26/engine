@@ -9,8 +9,18 @@ pub struct PHackMesh {
 
 impl PHackMesh {
     pub fn new() -> Self {
-        const YELLOW: Color = Color {r: 255, g: 248, b: 54, a: 0};
-        const PURPLE: Color = Color {r: 171, g: 54, b: 255, a: 0};
+        const YELLOW: Color = Color {
+            r: 255,
+            g: 248,
+            b: 54,
+            a: 255,
+        };
+        const PURPLE: Color = Color {
+            r: 171,
+            g: 54,
+            b: 255,
+            a: 255,
+        };
         Self {
             verts: vec![
                 Point3::new(-0.5, 1.5, -0.5),
@@ -104,9 +114,9 @@ impl PHackMesh {
                     color: YELLOW,
                 },
                 Triangle {
-                    v1: 13,
-                    v2: 21,
-                    v3: 20,
+                    v1: 20,
+                    v2: 13,
+                    v3: 21,
                     color: YELLOW,
                 },
                 Triangle {

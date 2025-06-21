@@ -1,7 +1,4 @@
 use crate::mesh::{Mesh, Triangle};
-use macroquad::color::{
-    BEIGE, BLUE, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED, YELLOW,
-};
 use nalgebra::Point3;
 
 #[derive(Debug)]

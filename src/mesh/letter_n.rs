@@ -1,5 +1,4 @@
 use crate::mesh::{Mesh, Triangle};
-use macroquad::color::{BLUE, GOLD, GREEN, PINK, PURPLE, RED};
 use nalgebra::Point3;
 
 #[derive(Debug)]

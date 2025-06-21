@@ -1,5 +1,4 @@
 use crate::mesh::{Mesh, Triangle};
-use macroquad::color::{BLUE, GREEN, ORANGE, RED};
 use nalgebra::Point3;
 use std::f32::consts::PI;
 
