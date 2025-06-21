@@ -1,5 +1,4 @@
-use crate::mesh::{Mesh, Triangle};
-use macroquad::color::{PURPLE, YELLOW};
+use crate::mesh::{Color, Mesh, Triangle};
 use nalgebra::Point3;
 
 #[derive(Debug)]
@@ -10,6 +9,8 @@ pub struct PHackMesh {
 
 impl PHackMesh {
     pub fn new() -> Self {
+        const YELLOW: Color = Color {r: 255, g: 248, b: 54, a: 0};
+        const PURPLE: Color = Color {r: 171, g: 54, b: 255, a: 0};
         Self {
             verts: vec![
                 Point3::new(-0.5, 1.5, -0.5),
