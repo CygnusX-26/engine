@@ -1,4 +1,7 @@
-use crate::mesh::{Mesh, Triangle};
+use crate::mesh::{
+    Mesh, Triangle, BEIGE, BLUE, DARKBLUE, GOLD, GRAY, GREEN, LIME, ORANGE, PINK, PURPLE, RED,
+    SKYBLUE, YELLOW,
+};
 use nalgebra::Point3;
 use std::f32::consts::PI;
 
@@ -9,7 +12,7 @@ pub struct ConeMesh {
 }
 
 impl ConeMesh {
-    pub fn _new(height: f32, radius: f32) -> Self {
+    pub fn new(height: f32, radius: f32) -> Self {
         let offset = -height / 2.0;
 
         let mut verts: Vec<Point3<f32>> = (0..12)

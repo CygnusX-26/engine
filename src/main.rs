@@ -16,6 +16,8 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
+use crate::mesh::cone::ConeMesh;
+
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
 
@@ -194,7 +196,7 @@ impl World {
         };
         for y in min_y..=max_y {
             for x in min_x..=max_x {
-                let p = (x as f32 , y as f32);
+                let p = (x as f32, y as f32);
                 let w0 = edge((x2, y2), (x3, y3), p);
                 let w1 = edge((x3, y3), (x1, y1), p);
                 let w2 = edge((x1, y1), (x2, y2), p);
@@ -316,6 +318,12 @@ fn main() -> Result<(), Error> {
                 offset_x: 3.0,
                 offset_y: 0.0,
                 offset_z: 3.0,
+            },
+            Object {
+                mesh: Box::new(ConeMesh::new(2.0, 1.0)),
+                offset_x: 5.0,
+                offset_y: -0.5,
+                offset_z: 5.0,
             },
         ],
     );

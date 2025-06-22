@@ -1,4 +1,4 @@
-use crate::mesh::{Mesh, Triangle};
+use crate::mesh::{Mesh, Triangle, BLUE, GOLD, GREEN, PINK, PURPLE, RED};
 use nalgebra::Point3;
 
 #[derive(Debug)]
