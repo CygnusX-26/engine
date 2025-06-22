@@ -108,7 +108,8 @@ impl World {
             let proj = self.proj_mat * view_mat * model_mat;
 
             for vertex in model.verts().iter().copied() {
-                let persproj = proj * Point4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
+                let persproj = proj
+                    * Point4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
                 let ndc_z = persproj.z / persproj.w;

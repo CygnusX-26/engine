@@ -7,9 +7,9 @@ pub mod p_hack;
 use nalgebra::{Point3, Vector3};
 
 #[derive(Debug, Copy, Clone)]
- pub struct Vertex {
+pub struct Vertex {
     pub position: Point3<f32>,
-    pub normal: Vector3<f32>
+    pub normal: Vector3<f32>,
 }
 
 #[derive(Debug)]
