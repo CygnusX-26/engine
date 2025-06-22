@@ -1,40 +1,39 @@
-use crate::mesh::{Mesh, Triangle, PURPLE, YELLOW};
-use nalgebra::Point3;
+use crate::mesh::{Mesh, Triangle, Vertex, PURPLE, YELLOW};
+use nalgebra::{Point3, Vector3};
 
 #[derive(Debug)]
 pub struct PHackMesh {
-    verts: Vec<Point3<f32>>,
+    verts: Vec<Vertex>,
     tris: Vec<Triangle>,
 }
 
 impl PHackMesh {
     pub fn new() -> Self {
-        Self {
-            verts: vec![
-                Point3::new(-0.5, 1.5, -0.5),
-                Point3::new(0.5, 1.5, -0.5),
-                Point3::new(-0.5, -0.5, -0.5),
-                Point3::new(0.5, 0.5, -0.5),
-                Point3::new(0.5, -0.5, -0.5),
-                Point3::new(1.5, 0.5, -0.5),
-                Point3::new(1.5, -1.5, -0.5),
-                Point3::new(0.5, -1.5, -0.5),
-                Point3::new(-1.5, -0.5, -0.5),
-                Point3::new(-1.5, -1.5, -0.5),
-                Point3::new(-0.5, -1.5, -0.5),
-                Point3::new(-0.5, 1.5, 0.5),
-                Point3::new(0.5, 1.5, 0.5),
-                Point3::new(-0.5, -0.5, 0.5),
-                Point3::new(0.5, 0.5, 0.5),
-                Point3::new(0.5, -0.5, 0.5),
-                Point3::new(1.5, 0.5, 0.5),
-                Point3::new(1.5, -1.5, 0.5),
-                Point3::new(0.5, -1.5, 0.5),
-                Point3::new(-1.5, -0.5, 0.5),
-                Point3::new(-1.5, -1.5, 0.5),
-                Point3::new(-0.5, -1.5, 0.5),
-            ],
-            tris: vec![
+        let mut verts: Vec<Vertex> = vec![
+            Vertex { position: Point3::new(-0.5, 1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, 1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-0.5, -0.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, 0.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, -0.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(1.5, 0.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(1.5, -1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, -1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-1.5, -0.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-1.5, -1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-0.5, -1.5, -0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-0.5, 1.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, 1.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-0.5, -0.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, 0.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, -0.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(1.5, 0.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(1.5, -1.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(0.5, -1.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-1.5, -0.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-1.5, -1.5, 0.5), normal: Vector3::zeros() },
+            Vertex { position: Point3::new(-0.5, -1.5, 0.5), normal: Vector3::zeros() },
+        ];
+        let tris: Vec<Triangle> = vec![
                 Triangle {
                     v1: 0,
                     v2: 4,
@@ -251,17 +250,39 @@ impl PHackMesh {
                     v3: 7,
                     color: PURPLE,
                 },
-            ],
+        ];
+        for triangle in &tris {
+            let i0 = triangle.v1 as usize;
+            let i1 = triangle.v2 as usize;
+            let i2 = triangle.v3 as usize;
+
+            let v0 = verts[i0].position;
+            let v1 = verts[i1].position;
+            let v2 = verts[i2].position;
+            let edge1 = v1 - v0;
+            let edge2 = v2 - v0;
+            let face_normal = edge1.cross(&edge2).normalize();
+
+            verts[i0].normal += face_normal;
+            verts[i1].normal += face_normal;
+            verts[i2].normal += face_normal;
+        }
+        for vertex in &mut verts {
+            vertex.normal = vertex.normal.normalize();
+        }
+        Self {
+            verts,
+            tris
         }
     }
 }
 
 impl Mesh for PHackMesh {
-    fn tris(&self) -> &Vec<Triangle> {
+    fn tris(&self) -> &[Triangle] {
         &self.tris
     }
 
-    fn verts(&self) -> &[Point3<f32>] {
+    fn verts(&self) -> &[Vertex] {
         &self.verts
     }
 }

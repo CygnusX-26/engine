@@ -102,7 +102,7 @@ impl CubeMesh {
 }
 
 impl Mesh for CubeMesh {
-    fn tris(&self) -> &Vec<Triangle> {
+    fn tris(&self) -> &[Triangle] {
         &self.tris
     }
 

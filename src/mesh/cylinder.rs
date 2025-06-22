@@ -69,7 +69,7 @@ impl CylinderMesh {
 }
 
 impl Mesh for CylinderMesh {
-    fn tris(&self) -> &Vec<Triangle> {
+    fn tris(&self) -> &[Triangle] {
         &self.tris
     }
 

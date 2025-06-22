@@ -180,7 +180,7 @@ impl ConeMesh {
 }
 
 impl Mesh for ConeMesh {
-    fn tris(&self) -> &Vec<Triangle> {
+    fn tris(&self) -> &[Triangle] {
         &self.tris
     }
 

@@ -16,8 +16,6 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use crate::mesh::cone::ConeMesh;
-
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
 
@@ -110,7 +108,7 @@ impl World {
             let proj = self.proj_mat * view_mat * model_mat;
 
             for vertex in model.verts().iter().copied() {
-                let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
+                let persproj = proj * Point4::new(vertex.position.x, vertex.position.y, vertex.position.z, 1.0);
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
                 let ndc_z = persproj.z / persproj.w;
@@ -122,8 +120,8 @@ impl World {
                     let screen_y = (1.0 - ndc_y) * 0.5 * HEIGHT as f32;
                     screen_verts.push(Point2::new(screen_x, screen_y));
                 }
-                zbuffer.push(view_mat * model_mat * Vector4::from(vertex));
-                transformed_verts.push(model_mat * Vector4::from(vertex));
+                zbuffer.push(view_mat * model_mat * Vector4::from(vertex.position));
+                transformed_verts.push(model_mat * Vector4::from(vertex.position));
             }
 
             //Z order each triangle in each mesh
@@ -318,12 +316,6 @@ fn main() -> Result<(), Error> {
                 offset_x: 3.0,
                 offset_y: 0.0,
                 offset_z: 3.0,
-            },
-            Object {
-                mesh: Box::new(ConeMesh::new(2.0, 1.0)),
-                offset_x: 5.0,
-                offset_y: -0.5,
-                offset_z: 5.0,
             },
         ],
     );

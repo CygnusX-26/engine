@@ -1,10 +1,16 @@
-pub mod cone;
-pub mod cube;
-pub mod cylinder;
-pub mod letter_n;
+// pub mod cone;
+// pub mod cube;
+// pub mod cylinder;
+// pub mod letter_n;
 pub mod p_hack;
 
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
+
+#[derive(Debug, Copy, Clone)]
+ pub struct Vertex {
+    pub position: Point3<f32>,
+    pub normal: Vector3<f32>
+}
 
 #[derive(Debug)]
 pub struct Triangle {
@@ -21,10 +27,9 @@ pub struct Color {
     pub b: u8,
     pub a: u8,
 }
-
-pub trait Mesh {
-    fn verts(&self) -> &[Point3<f32>];
-    fn tris(&self) -> &Vec<Triangle>;
+pub trait Mesh: Sync {
+    fn verts(&self) -> &[Vertex];
+    fn tris(&self) -> &[Triangle];
 }
 
 pub const RED: Color = Color {

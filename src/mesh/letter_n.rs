@@ -231,7 +231,7 @@ impl LetterNMesh {
 }
 
 impl Mesh for LetterNMesh {
-    fn tris(&self) -> &Vec<Triangle> {
+    fn tris(&self) -> &[Triangle] {
         &self.tris
     }
 
