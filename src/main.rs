@@ -1,9 +1,11 @@
 mod mesh;
 
+use mesh::Vertex;
 use mesh::p_hack::PHackMesh;
 use mesh::Color;
-use mesh::Mesh as MyMesh;
+use mesh::Mesh;
 use mesh::Triangle;
+
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
@@ -17,14 +19,11 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use crate::mesh::cube::CubeMesh;
-use crate::mesh::Vertex;
-
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
 
 pub struct Object {
-    mesh: Box<dyn MyMesh>,
+    mesh: Box<dyn Mesh>,
     offset_x: f32,
     offset_y: f32,
     offset_z: f32,
@@ -108,7 +107,7 @@ impl World {
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
             let mut transformed_verts: Vec<Vertex> = Vec::new();
-
+            let normal_mat = model_mat.fixed_view::<3, 3>(0, 0).try_inverse().unwrap().transpose();
             let proj = self.proj_mat * view_mat * model_mat;
 
             for vertex in model.verts().iter().copied() {
@@ -128,7 +127,7 @@ impl World {
                 zbuffer.push(view_mat * model_mat * Vector4::from(vertex.position));
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
-                    normal: vertex.normal,
+                    normal: normal_mat * vertex.normal,
                 });
             }
 
@@ -179,46 +178,52 @@ impl World {
         let (x1, y1) = (t1.x, t1.y);
         let (x2, y2) = (t2.x, t2.y);
         let (x3, y3) = (t3.x, t3.y);
-        let min_x = (x1.min(x2).min(x3).max(0.0)) as i32;
-        let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as i32;
-        let min_y = (y1.min(y2).min(y3).max(0.0)) as i32;
-        let max_y = (y1.max(y2).max(y3).min(HEIGHT as f32 - 1.0) + 1.0) as i32;
+        let min_x = (x1.min(x2).min(x3).max(0.0)) as usize;
+        let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as usize;
+        let min_y = (y1.min(y2).min(y3).max(0.0)) as usize;
+        let max_y = (y1.max(y2).max(y3).min(HEIGHT as f32 - 1.0) + 1.0) as usize;
+
+        if min_x > max_x {
+            return;
+        }
+        
+        if min_y > max_y {
+            return;
+        }
 
         let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
             (py - ay) * (bx - ax) - (px - ax) * (by - ay)
         };
 
         let row_stride = (WIDTH as usize) * 4;
-
+        
         frame
             .par_chunks_exact_mut(row_stride)
-            .skip(min_y as usize)
-            .take((max_y - min_y) as usize)
+            .skip(min_y)
+            .take(max_y - min_y)
             .enumerate()
             .for_each(|(row_idx, row)| {
-                let y = row_idx + (min_y as usize);
-
+                let y = row_idx + min_y;
                 for x in min_x..=max_x {
                     let p = (x as f32, y as f32);
                     let mut w0 = edge((x2, y2), (x3, y3), p);
                     let mut w1 = edge((x3, y3), (x1, y1), p);
                     let mut w2 = edge((x1, y1), (x2, y2), p);
-                    let sum = w0 + w1 + w2;
-                    w0 /= sum;
-                    w1 /= sum;
-                    w2 /= sum;
-
                     if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
+                        let sum = w0 + w1 + w2;
+                        
+                        w0 /= sum;
+                        w1 /= sum;
+                        w2 /= sum;
                         let interpolated_normal = w0 * n1 + w1 * n2 + w2 * n3;
-                        let diffuse = (light_dir.dot(&interpolated_normal)).clamp(0.0, 1.0);
+                        let diffuse = light_dir.dot(&interpolated_normal);
+                        let diffuse = if diffuse > 1.0 { 1.0 } else if diffuse < 0.0 { 0.0 } else { diffuse };
                         let specular = 0.0; //no fancy lighting for now its too laggy
                         let coloring = ambient + diffuse + specular;
-                        let colormap =
-                            |comp: u8, coloring: f32| -> u8 { ((comp as f32) * coloring) as u8 };
                         let p_color = Color {
-                            r: colormap(color.r, coloring),
-                            g: colormap(color.g, coloring),
-                            b: colormap(color.b, coloring),
+                            r: ((color.r as f32) * coloring) as u8,
+                            g: ((color.g as f32) * coloring) as u8,
+                            b: ((color.b as f32) * coloring) as u8,
                             a: color.a,
                         };
 
@@ -320,29 +325,35 @@ fn main() -> Result<(), Error> {
             yaw: 0.0,
         },
         Light {
-            position: Point3::new(0.0, 5.0, -1.0),
+            position: Point3::new(0.0, 3.0, -1.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
-            ambient: 0.3,
+            ambient: 0.4,
         },
-        Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.1, 200.0).to_homogeneous(),
+        Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
         vec![
             Object {
-                mesh: Box::new(CubeMesh::new()),
+                mesh: Box::new(PHackMesh::new()),
                 offset_x: 0.0,
-                offset_y: -0.5,
-                offset_z: 5.0,
-            },
-            Object {
-                mesh: Box::new(CubeMesh::new()),
-                offset_x: 3.0,
-                offset_y: -0.5,
+                offset_y: 0.0,
                 offset_z: 0.0,
             },
             Object {
                 mesh: Box::new(PHackMesh::new()),
                 offset_x: 0.0,
-                offset_y: 0.0,
+                offset_y: 5.0,
+                offset_z: 0.0,
+            },
+            Object {
+                mesh: Box::new(PHackMesh::new()),
+                offset_x: 0.0,
+                offset_y: 10.0,
+                offset_z: 0.0,
+            },
+            Object {
+                mesh: Box::new(PHackMesh::new()),
+                offset_x: 0.0,
+                offset_y: 15.0,
                 offset_z: 0.0,
             },
         ],
