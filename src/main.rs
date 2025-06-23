@@ -244,38 +244,42 @@ fn is_front_facing(p1: Point2<f32>, p2: Point2<f32>, p3: Point2<f32>) -> bool {
     cross > 0.0
 }
 
+fn camera_shift(camera: &mut Camera, delta: Vector3<f32>) {
+    camera.position.x += delta.x;
+    camera.position.z += delta.z;
+    camera.target.x += delta.x;
+    camera.target.z += delta.z;
+}
+
 /// Handle key press turning and etc... TODO add mouse movement
 fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -> Matrix4<f32> {
     if input.key_held(KeyCode::KeyA) {
-        let delta: Vector3<f32> = (camera.position - camera.target)
+        let mut delta: Vector3<f32> = (camera.position - camera.target)
             .normalize()
             .cross(&camera.up)
             * move_speed;
-        camera.position.x += delta.x;
-        camera.position.z += delta.z;
-        camera.target.x += delta.x;
-        camera.target.z += delta.z;
+        delta -= delta.dot(&camera.up) * camera.up;
+        delta = delta.normalize() * move_speed;
+        camera_shift(camera, delta);
+        
     } else if input.key_held(KeyCode::KeyD) {
-        let delta: Vector3<f32> = (camera.position - camera.target)
+        let mut delta: Vector3<f32> = (camera.position - camera.target)
             .normalize()
             .cross(&camera.up)
             * move_speed;
-        camera.position.x -= delta.x;
-        camera.position.z -= delta.z;
-        camera.target.x -= delta.x;
-        camera.target.z -= delta.z;
+        delta -= delta.dot(&camera.up) * camera.up;
+        delta = delta.normalize() * move_speed;
+        camera_shift(camera, -delta);
     } else if input.key_held(KeyCode::KeyW) {
-        let delta: Vector3<f32> = (camera.position - camera.target).normalize() * move_speed;
-        camera.position.x -= delta.x;
-        camera.position.z -= delta.z;
-        camera.target.x -= delta.x;
-        camera.target.z -= delta.z;
+        let mut delta: Vector3<f32> = (camera.position - camera.target).normalize();
+        delta -= delta.dot(&camera.up) * camera.up;
+        delta = delta.normalize() * move_speed;
+        camera_shift(camera, -delta);
     } else if input.key_held(KeyCode::KeyS) {
-        let delta: Vector3<f32> = (camera.position - camera.target).normalize() * move_speed;
-        camera.position.x += delta.x;
-        camera.position.z += delta.z;
-        camera.target.x += delta.x;
-        camera.target.z += delta.z;
+        let mut delta: Vector3<f32> = (camera.position - camera.target).normalize();
+        delta -= delta.dot(&camera.up) * camera.up;
+        delta = delta.normalize() * move_speed;
+        camera_shift(camera, delta);
     }
     camera.generate_view_mat()
 }
@@ -341,19 +345,19 @@ fn main() -> Result<(), Error> {
             Object {
                 mesh: Box::new(PHackMesh::new()),
                 offset_x: 0.0,
-                offset_y: 5.0,
+                offset_y: 4.0,
                 offset_z: 0.0,
             },
             Object {
                 mesh: Box::new(PHackMesh::new()),
                 offset_x: 0.0,
-                offset_y: 10.0,
+                offset_y: 8.0,
                 offset_z: 0.0,
             },
             Object {
                 mesh: Box::new(PHackMesh::new()),
                 offset_x: 0.0,
-                offset_y: 15.0,
+                offset_y: 12.0,
                 offset_z: 0.0,
             },
         ],
