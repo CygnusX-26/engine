@@ -1,5 +1,5 @@
 // pub mod cone;
-// pub mod cube;
+pub mod cube;
 // pub mod cylinder;
 // pub mod letter_n;
 pub mod p_hack;

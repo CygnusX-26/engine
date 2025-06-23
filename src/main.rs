@@ -6,6 +6,7 @@ use mesh::Mesh as MyMesh;
 use mesh::Triangle;
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
+use rayon::prelude::*;
 
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
@@ -15,6 +16,9 @@ use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
+
+use crate::mesh::cube::CubeMesh;
+use crate::mesh::Vertex;
 
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
@@ -103,7 +107,7 @@ impl World {
             let model = &mesh.mesh;
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
-            let mut transformed_verts: Vec<Vector4<f32>> = Vec::new();
+            let mut transformed_verts: Vec<Vertex> = Vec::new();
 
             let proj = self.proj_mat * view_mat * model_mat;
 
@@ -122,7 +126,10 @@ impl World {
                     screen_verts.push(Point2::new(screen_x, screen_y));
                 }
                 zbuffer.push(view_mat * model_mat * Vector4::from(vertex.position));
-                transformed_verts.push(model_mat * Vector4::from(vertex.position));
+                transformed_verts.push(Vertex {
+                    position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
+                    normal: vertex.normal,
+                });
             }
 
             //Z order each triangle in each mesh
@@ -145,16 +152,12 @@ impl World {
                     continue;
                 }
 
-                let v1 = transformed_verts[tri.v1];
-                let v2 = transformed_verts[tri.v2];
-                let v3 = transformed_verts[tri.v3];
-
-                let norm = (v2.xyz() - v1.xyz())
-                    .normalize()
-                    .cross(&(v3.xyz() - v1.xyz()).normalize());
+                let n1 = transformed_verts[tri.v1].normal;
+                let n2 = transformed_verts[tri.v2].normal;
+                let n3 = transformed_verts[tri.v3].normal;
 
                 if is_front_facing(s1, s2, s3) {
-                    self.draw_triangle(s1, s2, s3, &tri.color, frame, &norm);
+                    self.draw_triangle(s1, s2, s3, &tri.color, frame, n1, n2, n3);
                 }
             }
         }
@@ -167,21 +170,12 @@ impl World {
         t3: Point2<f32>,
         color: &Color,
         frame: &mut [u8],
-        norm: &Vector3<f32>,
+        n1: Vector3<f32>,
+        n2: Vector3<f32>,
+        n3: Vector3<f32>,
     ) {
         let light_dir = (self.light.target - self.light.position).normalize();
         let ambient = self.light.ambient;
-        let diffuse = (light_dir.dot(norm) * self.light.intensity).clamp(0.0, 1.0);
-        let specular = 0.0; //no fancy lighting for now its too laggy
-        let coloring = ambient + diffuse + specular;
-        let colormap = |comp: u8, coloring: f32| -> u8 { ((comp as f32) * coloring) as u8 };
-        let p_color = Color {
-            r: colormap(color.r, coloring),
-            g: colormap(color.g, coloring),
-            b: colormap(color.b, coloring),
-            a: color.a,
-        };
-
         let (x1, y1) = (t1.x, t1.y);
         let (x2, y2) = (t2.x, t2.y);
         let (x3, y3) = (t3.x, t3.y);
@@ -193,22 +187,49 @@ impl World {
         let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
             (py - ay) * (bx - ax) - (px - ax) * (by - ay)
         };
-        for y in min_y..=max_y {
-            for x in min_x..=max_x {
-                let p = (x as f32, y as f32);
-                let w0 = edge((x2, y2), (x3, y3), p);
-                let w1 = edge((x3, y3), (x1, y1), p);
-                let w2 = edge((x1, y1), (x2, y2), p);
 
-                if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
-                    let index = (y as u32 * WIDTH + x as u32) * 4;
-                    if index as usize + 4 <= frame.len() {
-                        frame[index as usize..index as usize + 4]
-                            .copy_from_slice(&[p_color.r, p_color.g, p_color.b, p_color.a]);
+        let row_stride = (WIDTH as usize) * 4;
+
+        frame
+            .par_chunks_exact_mut(row_stride)
+            .skip(min_y as usize)
+            .take((max_y - min_y) as usize)
+            .enumerate()
+            .for_each(|(row_idx, row)| {
+                let y = row_idx + (min_y as usize);
+
+                for x in min_x..=max_x {
+                    let p = (x as f32, y as f32);
+                    let mut w0 = edge((x2, y2), (x3, y3), p);
+                    let mut w1 = edge((x3, y3), (x1, y1), p);
+                    let mut w2 = edge((x1, y1), (x2, y2), p);
+                    let sum = w0 + w1 + w2;
+                    w0 /= sum;
+                    w1 /= sum;
+                    w2 /= sum;
+
+                    if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
+                        let interpolated_normal = w0 * n1 + w1 * n2 + w2 * n3;
+                        let diffuse = (light_dir.dot(&interpolated_normal)).clamp(0.0, 1.0);
+                        let specular = 0.0; //no fancy lighting for now its too laggy
+                        let coloring = ambient + diffuse + specular;
+                        let colormap =
+                            |comp: u8, coloring: f32| -> u8 { ((comp as f32) * coloring) as u8 };
+                        let p_color = Color {
+                            r: colormap(color.r, coloring),
+                            g: colormap(color.g, coloring),
+                            b: colormap(color.b, coloring),
+                            a: color.a,
+                        };
+
+                        let idx = (x as usize) * 4;
+                        if idx + 4 <= row.len() {
+                            row[idx..idx + 4]
+                                .copy_from_slice(&[p_color.r, p_color.g, p_color.b, p_color.a]);
+                        }
                     }
                 }
-            }
-        }
+            });
     }
 }
 
@@ -279,10 +300,10 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
-    window
-        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-        .unwrap();
-    window.set_cursor_visible(false);
+    // window
+    //     .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+    //     .unwrap();
+    // window.set_cursor_visible(false);
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -299,7 +320,7 @@ fn main() -> Result<(), Error> {
             yaw: 0.0,
         },
         Light {
-            position: Point3::new(-1.0, 1.0, -1.0),
+            position: Point3::new(0.0, 5.0, -1.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
             ambient: 0.3,
@@ -307,16 +328,22 @@ fn main() -> Result<(), Error> {
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.1, 200.0).to_homogeneous(),
         vec![
             Object {
-                mesh: Box::new(PHackMesh::new()),
+                mesh: Box::new(CubeMesh::new()),
                 offset_x: 0.0,
-                offset_y: 0.0,
+                offset_y: -0.5,
+                offset_z: 5.0,
+            },
+            Object {
+                mesh: Box::new(CubeMesh::new()),
+                offset_x: 3.0,
+                offset_y: -0.5,
                 offset_z: 0.0,
             },
             Object {
                 mesh: Box::new(PHackMesh::new()),
-                offset_x: 3.0,
+                offset_x: 0.0,
                 offset_y: 0.0,
-                offset_z: 3.0,
+                offset_z: 0.0,
             },
         ],
     );
