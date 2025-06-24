@@ -1,8 +1,5 @@
-// pub mod cone;
-pub mod cube;
-// pub mod cylinder;
-// pub mod letter_n;
-pub mod p_hack;
+pub mod premade;
+pub mod loader;
 
 use nalgebra::{Point3, Vector3};
 

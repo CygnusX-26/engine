@@ -1,10 +1,8 @@
 mod mesh;
 
 use mesh::Vertex;
-use mesh::p_hack::PHackMesh;
-use mesh::Color;
-use mesh::Mesh;
-use mesh::Triangle;
+//use mesh::premade::p_hack::PHackMesh;
+use mesh::{Color, Triangle, Mesh};
 
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
@@ -18,6 +16,8 @@ use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
+
+use crate::mesh::loader::LoadedMesh;
 
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
@@ -309,10 +309,10 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
-    window
-        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-        .unwrap();
-    window.set_cursor_visible(false);
+    // window
+    //     .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+    //     .unwrap();
+    // window.set_cursor_visible(false);
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -320,44 +320,29 @@ fn main() -> Result<(), Error> {
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
     };
 
+    let Ok(msh) = LoadedMesh::from_file("test.obj") else {
+        panic!("whar");
+    };
     let mut world = World::new(
         Camera {
-            position: Point3::new(0.0, 0.0, -5.0),
+            position: Point3::new(0.0, 0.0, -10.0),
             target: Point3::new(0.0, 0.0, 0.0),
             up: Vector3::new(0.0, 1.0, 0.0),
             pitch: 0.0,
             yaw: 0.0,
         },
         Light {
-            position: Point3::new(0.0, 3.0, -1.0),
+            position: Point3::new(0.0, 1.0, -5.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
-            ambient: 0.4,
+            ambient: 0.5,
         },
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
         vec![
             Object {
-                mesh: Box::new(PHackMesh::new()),
+                mesh: Box::new(msh),
                 offset_x: 0.0,
                 offset_y: 0.0,
-                offset_z: 0.0,
-            },
-            Object {
-                mesh: Box::new(PHackMesh::new()),
-                offset_x: 0.0,
-                offset_y: 4.0,
-                offset_z: 0.0,
-            },
-            Object {
-                mesh: Box::new(PHackMesh::new()),
-                offset_x: 0.0,
-                offset_y: 8.0,
-                offset_z: 0.0,
-            },
-            Object {
-                mesh: Box::new(PHackMesh::new()),
-                offset_x: 0.0,
-                offset_y: 12.0,
                 offset_z: 0.0,
             },
         ],
