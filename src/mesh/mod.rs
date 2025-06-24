@@ -1,5 +1,6 @@
-pub mod premade;
+#![allow(unused)]
 pub mod loader;
+pub mod premade;
 
 use nalgebra::{Point3, Vector3};
 

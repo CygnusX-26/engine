@@ -2,7 +2,7 @@ mod mesh;
 
 use mesh::Vertex;
 //use mesh::premade::p_hack::PHackMesh;
-use mesh::{Color, Triangle, Mesh};
+use mesh::{Color, Mesh, Triangle};
 
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
@@ -17,7 +17,7 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use crate::mesh::loader::LoadedMesh;
+use crate::mesh::loader::GenericMesh;
 
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
@@ -107,7 +107,11 @@ impl World {
             let mut screen_verts: Vec<Point2<f32>> = Vec::new();
             let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
             let mut transformed_verts: Vec<Vertex> = Vec::new();
-            let normal_mat = model_mat.fixed_view::<3, 3>(0, 0).try_inverse().unwrap().transpose();
+            let normal_mat = model_mat
+                .fixed_view::<3, 3>(0, 0)
+                .try_inverse()
+                .unwrap()
+                .transpose();
             let proj = self.proj_mat * view_mat * model_mat;
 
             for vertex in model.verts().iter().copied() {
@@ -186,7 +190,7 @@ impl World {
         if min_x > max_x {
             return;
         }
-        
+
         if min_y > max_y {
             return;
         }
@@ -196,7 +200,7 @@ impl World {
         };
 
         let row_stride = (WIDTH as usize) * 4;
-        
+
         frame
             .par_chunks_exact_mut(row_stride)
             .skip(min_y)
@@ -211,13 +215,19 @@ impl World {
                     let mut w2 = edge((x1, y1), (x2, y2), p);
                     if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
                         let sum = w0 + w1 + w2;
-                        
+
                         w0 /= sum;
                         w1 /= sum;
                         w2 /= sum;
                         let interpolated_normal = w0 * n1 + w1 * n2 + w2 * n3;
                         let diffuse = light_dir.dot(&interpolated_normal);
-                        let diffuse = if diffuse > 1.0 { 1.0 } else if diffuse < 0.0 { 0.0 } else { diffuse };
+                        let diffuse = if diffuse > 1.0 {
+                            1.0
+                        } else if diffuse < 0.0 {
+                            0.0
+                        } else {
+                            diffuse
+                        };
                         let specular = 0.0; //no fancy lighting for now its too laggy
                         let coloring = ambient + diffuse + specular;
                         let p_color = Color {
@@ -261,7 +271,6 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
         delta -= delta.dot(&camera.up) * camera.up;
         delta = delta.normalize() * move_speed;
         camera_shift(camera, delta);
-        
     } else if input.key_held(KeyCode::KeyD) {
         let mut delta: Vector3<f32> = (camera.position - camera.target)
             .normalize()
@@ -297,6 +306,12 @@ fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32>
 
 fn main() -> Result<(), Error> {
     env_logger::init();
+    let filename = "objects/gourd.obj";
+    let msh = GenericMesh::from_file(filename).unwrap_or_else(|e| {
+        error!("File: {}", filename);
+        error!("{:?}", e);
+        std::process::exit(1);
+    });
     let mut input = WinitInputHelper::new();
     let event_loop = EventLoop::new().unwrap();
     let window = {
@@ -309,10 +324,10 @@ fn main() -> Result<(), Error> {
             .unwrap()
     };
 
-    // window
-    //     .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-    //     .unwrap();
-    // window.set_cursor_visible(false);
+    window
+        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+        .unwrap();
+    window.set_cursor_visible(false);
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -320,9 +335,6 @@ fn main() -> Result<(), Error> {
         Pixels::new(WIDTH, HEIGHT, surface_texture)?
     };
 
-    let Ok(msh) = LoadedMesh::from_file("test.obj") else {
-        panic!("whar");
-    };
     let mut world = World::new(
         Camera {
             position: Point3::new(0.0, 0.0, -10.0),
@@ -338,14 +350,12 @@ fn main() -> Result<(), Error> {
             ambient: 0.5,
         },
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
-        vec![
-            Object {
-                mesh: Box::new(msh),
-                offset_x: 0.0,
-                offset_y: 0.0,
-                offset_z: 0.0,
-            },
-        ],
+        vec![Object {
+            mesh: Box::new(msh),
+            offset_x: 0.0,
+            offset_y: 0.0,
+            offset_z: 0.0,
+        }],
     );
 
     let res = event_loop.run(|event, elwt| {

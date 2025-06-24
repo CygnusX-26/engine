@@ -4,56 +4,77 @@ use crate::mesh::{Mesh, Triangle, Vertex, SKYBLUE};
 use std::error::Error;
 use std::fs::read_to_string;
 
-pub struct LoadedMesh {
+pub struct GenericMesh {
     verts: Vec<Vertex>,
-    tris: Vec<Triangle>
+    tris: Vec<Triangle>,
 }
 
-impl LoadedMesh {
+impl GenericMesh {
     pub fn from_file(file_name: &str) -> Result<Self, Box<dyn Error>> {
-        let mut loaded_mesh: Self = Self {verts: vec![], tris: vec![]};
+        let mut loaded_mesh: Self = Self {
+            verts: vec![],
+            tris: vec![],
+        };
         let mut verts: Vec<Point3<f32>> = vec![];
         let mut normals: Vec<Vector3<f32>> = vec![];
         let mut tris: Vec<Triangle> = vec![];
 
-        for line in read_to_string(file_name)?.lines() {
-            if line.len() < 2 {
-                continue;
-            }
-            let line_type = &line[0..2];
-            match line_type {
-                "v " => {
-                    let field: Vec<&str> = line.split(" ").collect();
-                    verts.push(Point3::new(field[1].parse()?, field[2].parse()?, field[3].parse()?));
+        for (lineno, line) in read_to_string(file_name)?.lines().enumerate() {
+            let mut components = line.split_whitespace();
+            match components.next() {
+                Some("v") => {
+                    verts.push(Point3::new(
+                        components.next().ok_or(format!("Missing first vertex component at line: {}", lineno + 1))?.parse()?,
+                        components.next().ok_or(format!("Missing second vertex component at line: {}", lineno + 1))?.parse()?,
+                        components.next().ok_or(format!("Missing third vertex component at line: {}", lineno + 1))?.parse()?,
+                    ));
                 }
-                "vn" => {
-                    let field: Vec<&str> = line.split(" ").collect();
-                    normals.push(Vector3::new(field[1].parse()?, field[2].parse()?, field[3].parse()?));
+                Some("vn") => {
+                    normals.push(Vector3::new(
+                        components.next().ok_or(format!("Missing first normal component at line: {}", lineno + 1))?.parse()?,
+                        components.next().ok_or(format!("Missing second normal component at line: {}", lineno + 1))?.parse()?,
+                        components.next().ok_or(format!("Missing third normal component at line: {}", lineno + 1))?.parse()?,
+                    ));
                 }
-                "f " => {
-                    
-                    let field: Vec<&str> = line.split(" ").collect();
-                    let t1: Vec<&str> = field[1].split("/").collect();
-                    let t2: Vec<&str> = field[2].split("/").collect();
-                    let t3: Vec<&str> = field[3].split("/").collect();
-                    
+                Some("f") => {
+                    let t1 = components
+                        .next()
+                        .ok_or(format!("Missing triangle vertex at line: {}", lineno + 1))?
+                        .split("/")
+                        .next()
+                        .ok_or(format!("Missing first vertex value at line: {}", lineno + 1))?;
+                    let t2 = components
+                        .next()
+                        .ok_or(format!("Missing triangle vertex at line: {}", lineno + 1))?
+                        .split("/")
+                        .next()
+                        .ok_or(format!("Missing second vertex value at line: {}", lineno + 1))?;
+                    let t3 = components
+                        .next()
+                        .ok_or(format!("Missing triangle vertex at line: {}", lineno + 1))?
+                        .split("/")
+                        .next()
+                        .ok_or(format!("Missing third vertex value at line: {}", lineno + 1))?;
+
                     tris.push(Triangle {
-                        v1: t1.get(0)
-                            .ok_or("Missing vertex index")?
-                            .parse::<usize>()? - 1,
-                        v2: t3.get(0)
-                            .ok_or("Missing vertex index")?
-                            .parse::<usize>()? - 1,
-                        v3: t2.get(0)
-                            .ok_or("Missing vertex index")?
-                            .parse::<usize>()? - 1,
-                    color: SKYBLUE});
+                        v1: t1.parse::<usize>()? - 1,
+                        v2: t3.parse::<usize>()? - 1, // do these objs specify whether the triangles are wound cw or ccw?
+                        v3: t2.parse::<usize>()? - 1,
+                        color: SKYBLUE,
+                    });
                 }
-                _ => continue
+                _ => continue,
             }
         }
-        let mut vertices: Vec<Vertex> = verts.into_iter().map(|v| -> Vertex 
-            {Vertex {position: v, normal: Vector3::zeros()}}).collect();
+        let mut vertices: Vec<Vertex> = verts
+            .into_iter()
+            .map(|v| -> Vertex {
+                Vertex {
+                    position: v,
+                    normal: Vector3::zeros(),
+                }
+            })
+            .collect();
 
         for triangle in &tris {
             let i0 = triangle.v1 as usize;
@@ -76,12 +97,12 @@ impl LoadedMesh {
         }
         loaded_mesh.verts = vertices;
         loaded_mesh.tris = tris;
-       
+
         Ok(loaded_mesh)
     }
-}   
+}
 
-impl Mesh for LoadedMesh {
+impl Mesh for GenericMesh {
     fn tris(&self) -> &[Triangle] {
         &self.tris
     }
