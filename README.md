@@ -11,6 +11,11 @@ A super basic graphics engine i've been working on as both my first rust project
 
 ## usage
 
-You can mess around with the meshes and locations in main.rs
+In main.rs you can change the filename:
+```rust
+let filename = "objects/lamp.obj";
+```
+To any .obj file you want.
 
-WASD to move.
+Currently everything will be rendered SKYBLUE and polygons of degree >=3 are supported.
+

@@ -8,7 +8,7 @@ use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
 
-use log::error;
+use log::{error, info};
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
@@ -306,12 +306,15 @@ fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32>
 
 fn main() -> Result<(), Error> {
     env_logger::init();
-    let filename = "objects/gourd.obj";
-    let msh = GenericMesh::from_file(filename).unwrap_or_else(|e| {
-        error!("File: {}", filename);
+
+    let filename = "objects/lamp.obj";
+    info!("Loading mesh for {}", filename);
+    let mesh = GenericMesh::from_file(filename).unwrap_or_else(|e| {
         error!("{:?}", e);
         std::process::exit(1);
     });
+    info!("Done loading mesh for {}", filename);
+
     let mut input = WinitInputHelper::new();
     let event_loop = EventLoop::new().unwrap();
     let window = {
@@ -344,14 +347,14 @@ fn main() -> Result<(), Error> {
             yaw: 0.0,
         },
         Light {
-            position: Point3::new(0.0, 1.0, -5.0),
+            position: Point3::new(0.0, 1.0, 5.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
             ambient: 0.5,
         },
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
         vec![Object {
-            mesh: Box::new(msh),
+            mesh: Box::new(mesh),
             offset_x: 0.0,
             offset_y: 0.0,
             offset_z: 0.0,
