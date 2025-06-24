@@ -7,7 +7,7 @@ A super basic graphics engine i've been working on as both my first rust project
 
 ## Run
 
-`cargo run`
+`RUST_LOG=info cargo run`
 
 ## usage
 
