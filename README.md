@@ -13,4 +13,4 @@ Currently everything will be rendered SKYBLUE and polygons of degree >=3 are sup
 
 ## Examples
 
-[lamp](imgs/lamp.gif)
+![lamp](imgs/lamp.gif)
