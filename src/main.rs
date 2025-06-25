@@ -101,12 +101,13 @@ impl World {
             object_depth(&self.camera, model_mat)
         });
 
+        let mut screen_verts: Vec<Point2<f32>> = Vec::new();
+        let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
+        let mut transformed_verts: Vec<Vertex> = Vec::new();
+
         // Iterate over meshes in sorted zbuffer order
         for (mesh, model_mat) in &sorted_models {
             let model = &mesh.mesh;
-            let mut screen_verts: Vec<Point2<f32>> = Vec::new();
-            let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
-            let mut transformed_verts: Vec<Vertex> = Vec::new();
             let normal_mat = model_mat
                 .fixed_view::<3, 3>(0, 0)
                 .try_inverse()
@@ -163,6 +164,9 @@ impl World {
                     self.draw_triangle(s1, s2, s3, &tri.color, frame, n1, n2, n3);
                 }
             }
+            screen_verts.clear();
+            zbuffer.clear();
+            transformed_verts.clear();
         }
     }
 
@@ -307,7 +311,7 @@ fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32>
 fn main() -> Result<(), Error> {
     env_logger::init();
 
-    let filename = "objects/lamp.obj";
+    let filename = "objects/gourd.obj";
     info!("Loading mesh for {}", filename);
     let mesh = GenericMesh::from_file(filename).unwrap_or_else(|e| {
         error!("{:?}", e);
@@ -404,7 +408,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 0.1);
+            handle_keys(&input, &mut world.camera, 0.3);
             window.request_redraw();
         }
     });
