@@ -310,10 +310,12 @@ fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32>
 
 fn main() -> Result<(), Error> {
     env_logger::init();
-
-    let filename = "objects/gourd.obj";
+    let Some(filename) = std::env::args().nth(1) else {
+        error!("Usage: cargo run --release <filename>");
+        std::process::exit(1);
+    };
     info!("Loading mesh for {}", filename);
-    let mesh = GenericMesh::from_file(filename).unwrap_or_else(|e| {
+    let mesh = GenericMesh::from_file(&filename).unwrap_or_else(|e| {
         error!("{:?}", e);
         std::process::exit(1);
     });
