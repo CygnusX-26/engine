@@ -284,7 +284,7 @@ fn camera_shift(camera: &mut Camera, delta: Vector3<f32>) {
     camera.target.z += delta.z;
 }
 
-/// Handle key press turning and etc... TODO add mouse movement
+/// Handle key press turning and etc...
 fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -> Matrix4<f32> {
     if input.key_held(KeyCode::KeyA) {
         let mut delta: Vector3<f32> = (camera.position - camera.target)
@@ -312,9 +312,12 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
         delta -= delta.dot(&camera.up) * camera.up;
         delta = delta.normalize() * move_speed;
         camera_shift(camera, delta);
-    } else if input.key_pressed(KeyCode::Space) {
+    } else if input.key_held(KeyCode::Space) {
         camera.position.y += 0.2;
-        camera.position.y += 0.2;
+        camera.target.y += 0.2;
+    } else if input.key_held(KeyCode::ShiftLeft) {
+        camera.position.y -= 0.2;
+        camera.target.y -= 0.2;
     }
     camera.generate_view_mat()
 }
