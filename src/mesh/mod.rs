@@ -13,7 +13,7 @@ pub struct Vertex {
     pub texcoord: Point2<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Triangle {
     pub v1: usize,
     pub v2: usize,

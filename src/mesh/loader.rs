@@ -7,6 +7,7 @@ use std::fs::read_to_string;
 use std::hash::Hash;
 use std::str::SplitWhitespace;
 
+#[derive(Clone)]
 pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
@@ -144,9 +145,9 @@ impl GenericMesh {
             .collect();
 
         for triangle in &tris {
-            let i0 = triangle.v1 as usize;
-            let i1 = triangle.v2 as usize;
-            let i2 = triangle.v3 as usize;
+            let i0 = triangle.v1;
+            let i1 = triangle.v2;
+            let i2 = triangle.v3;
 
             let v0 = vertices[i0].position;
             let v1 = vertices[i1].position;
@@ -176,10 +177,10 @@ impl GenericMesh {
         let mut cur_mtl = Material::new();
         let binding = read_to_string(file_name)?;
         for (lineno, line) in binding.lines().enumerate() {
-            let mut components = line.trim().split_whitespace();
+            let mut components = line.split_whitespace();
             match components.next() {
                 Some("newmtl") => {
-                    if cur_mtl_name != "" {
+                    if !cur_mtl_name.is_empty() {
                         mtl_map.insert(String::from(cur_mtl_name), cur_mtl);
                         cur_mtl = Material::new();
                     }
@@ -219,7 +220,7 @@ impl GenericMesh {
                 }
             }
         }
-        if cur_mtl_name != "" {
+        if !cur_mtl_name.is_empty() {
             mtl_map.insert(String::from(cur_mtl_name), cur_mtl);
         }
         Ok(())

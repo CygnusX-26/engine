@@ -1,14 +1,16 @@
 mod mesh;
 
+use mesh::loader::GenericMesh;
+use mesh::Material;
 use mesh::Vertex;
-//use mesh::premade::p_hack::PHackMesh;
-use mesh::{Mesh, Triangle};
+use mesh::Mesh;
 
+use log::{error, info};
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
 use rayon::prelude::*;
+use std::sync::atomic::{AtomicU32, Ordering};
 
-use log::{error, info};
 use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
@@ -17,11 +19,8 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use crate::mesh::loader::GenericMesh;
-use crate::mesh::Material;
-
-const WIDTH: u32 = 500;
-const HEIGHT: u32 = 500;
+const WIDTH: usize = 500;
+const HEIGHT: usize = 500;
 
 pub struct Object {
     mesh: Box<dyn Mesh>,
@@ -70,7 +69,7 @@ impl World {
 
     pub fn draw(&mut self, view_mat: Matrix4<f32>, frame: &mut [u8]) {
         frame.fill(255);
-        let mut sorted_models: Vec<(&Object, Matrix4<f32>)> = self
+        let model_with_mats: Vec<(&Object, Matrix4<f32>)> = self
             .models
             .iter()
             .map(|model| -> (&Object, Matrix4<f32>) {
@@ -98,16 +97,15 @@ impl World {
             })
             .collect();
 
-        sorted_models.sort_by_key(|(_, model_mat)| -> OrderedFloat<f32> {
-            object_depth(&self.camera, model_mat)
-        });
-
-        let mut screen_verts: Vec<Point2<f32>> = Vec::new();
-        let mut zbuffer: Vec<Vector4<f32>> = Vec::new();
-        let mut transformed_verts: Vec<Vertex> = Vec::new();
+        let mut screen_verts: Vec<Point2<f32>> = vec![];
+        let mut zvalues: Vec<f32> = vec![];
+        let mut zbuffer: Vec<AtomicU32> = (0..WIDTH * HEIGHT)
+            .map(|_| AtomicU32::new(f32::to_bits(1.0)))
+            .collect();
+        let mut transformed_verts: Vec<Vertex> = vec![];
 
         // Iterate over meshes in sorted zbuffer order
-        for (mesh, model_mat) in &sorted_models {
+        for (mesh, model_mat) in &model_with_mats {
             let model = &mesh.mesh;
             let normal_mat = model_mat
                 .fixed_view::<3, 3>(0, 0)
@@ -130,7 +128,7 @@ impl World {
                     let screen_y = (1.0 - ndc_y) * 0.5 * HEIGHT as f32;
                     screen_verts.push(Point2::new(screen_x, screen_y));
                 }
-                zbuffer.push(view_mat * model_mat * Vector4::from(vertex.position));
+                zvalues.push(ndc_z);
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
                     normal: normal_mat * vertex.normal,
@@ -138,19 +136,8 @@ impl World {
                 });
             }
 
-            //Z order each triangle in each mesh
-            let mut z_ordered_tris: Vec<(&Triangle, f32)> = model
-                .tris()
-                .iter()
-                .map(|tri| -> (&Triangle, f32) {
-                    let z = (zbuffer[tri.v1].z + zbuffer[tri.v2].z + zbuffer[tri.v3].z) / 3.0;
-                    (tri, z)
-                })
-                .collect();
-            z_ordered_tris.sort_by_key(|tri| -> OrderedFloat<f32> { OrderedFloat(tri.1) });
-
             // Draw the triangles
-            for (tri, _) in z_ordered_tris {
+            for tri in model.tris() {
                 let s1 = screen_verts[tri.v1];
                 let s2 = screen_verts[tri.v2];
                 let s3 = screen_verts[tri.v3];
@@ -158,16 +145,32 @@ impl World {
                     continue;
                 }
 
-                let n1 = transformed_verts[tri.v1].normal;
-                let n2 = transformed_verts[tri.v2].normal;
-                let n3 = transformed_verts[tri.v3].normal;
-
                 if is_front_facing(s1, s2, s3) {
-                    self.draw_triangle(s1, s2, s3, &tri.mtl, frame, n1, n2, n3);
+                    let n1 = transformed_verts[tri.v1].normal;
+                    let n2 = transformed_verts[tri.v2].normal;
+                    let n3 = transformed_verts[tri.v3].normal;
+
+                    let z1 = zvalues[tri.v1];
+                    let z2 = zvalues[tri.v2];
+                    let z3 = zvalues[tri.v3];
+                    self.draw_triangle(
+                        s1,
+                        s2,
+                        s3,
+                        n1,
+                        n2,
+                        n3,
+                        z1,
+                        z2,
+                        z3,
+                        &tri.mtl,
+                        frame,
+                        &mut zbuffer,
+                    );
                 }
             }
             screen_verts.clear();
-            zbuffer.clear();
+            zvalues.clear();
             transformed_verts.clear();
         }
     }
@@ -177,11 +180,15 @@ impl World {
         t1: Point2<f32>,
         t2: Point2<f32>,
         t3: Point2<f32>,
-        mtl: &Material,
-        frame: &mut [u8],
         n1: Vector3<f32>,
         n2: Vector3<f32>,
         n3: Vector3<f32>,
+        z1: f32,
+        z2: f32,
+        z3: f32,
+        mtl: &Material,
+        frame: &mut [u8],
+        zbuffer: &mut [AtomicU32],
     ) {
         let light_dir = (self.light.target - self.light.position).normalize();
         let ambient = self.light.ambient;
@@ -205,7 +212,7 @@ impl World {
             (py - ay) * (bx - ax) - (px - ax) * (by - ay)
         };
 
-        let row_stride = (WIDTH as usize) * 4;
+        let row_stride = WIDTH * 4;
 
         frame
             .par_chunks_exact_mut(row_stride)
@@ -215,36 +222,48 @@ impl World {
             .for_each(|(row_idx, row)| {
                 let y = row_idx + min_y;
                 for x in min_x..=max_x {
+                    let z_index = y * WIDTH + x;
+                    if z_index >= WIDTH * HEIGHT {
+                        continue;
+                    }
                     let p = (x as f32, y as f32);
-                    let mut w0 = edge((x2, y2), (x3, y3), p);
-                    let mut w1 = edge((x3, y3), (x1, y1), p);
-                    let mut w2 = edge((x1, y1), (x2, y2), p);
-                    if w0 >= 0.0 && w1 >= 0.0 && w2 >= 0.0 {
-                        let sum = w0 + w1 + w2;
+                    let mut w1 = edge((x2, y2), (x3, y3), p);
+                    let mut w2 = edge((x3, y3), (x1, y1), p);
+                    let mut w3 = edge((x1, y1), (x2, y2), p);
+                    if w1 >= 0.0 && w2 >= 0.0 && w3 >= 0.0 {
+                        let sum = w1 + w2 + w3;
 
-                        w0 /= sum;
                         w1 /= sum;
                         w2 /= sum;
-                        let interpolated_normal = w0 * n1 + w1 * n2 + w2 * n3;
-                        let diffuse = light_dir.dot(&interpolated_normal);
-                        let diffuse = if diffuse > 1.0 {
-                            1.0
-                        } else if diffuse < 0.0 {
-                            0.0
-                        } else {
-                            diffuse
-                        };
-                        let specular = 0.0; //no fancy lighting for now its too laggy
-                        let color = mtl.ka * ambient + mtl.kd * diffuse + mtl.ks * specular;
+                        w3 /= sum;
 
-                        let idx = (x as usize) * 4;
-                        if idx + 4 <= row.len() {
-                            row[idx..idx + 4].copy_from_slice(&[
-                                (color.r * 255.0) as u8,
-                                (color.g * 255.0) as u8,
-                                (color.b * 255.0) as u8,
-                                (color.a * 255.0) as u8,
-                            ]);
+                        let current_z = &zbuffer[z_index];
+                        let current_z_bits = current_z.load(Ordering::Relaxed);
+                        let interpolated_z = w1 * z1 + w2 * z2 + w3 * z3;
+                        if interpolated_z < f32::from_bits(current_z_bits)
+                            && current_z
+                                .compare_exchange(
+                                    current_z_bits,
+                                    f32::to_bits(interpolated_z),
+                                    Ordering::Relaxed,
+                                    Ordering::Relaxed,
+                                )
+                                .is_ok()
+                        {
+                            let interpolated_normal = w1 * n1 + w2 * n2 + w3 * n3;
+                            let diffuse = light_dir.dot(&interpolated_normal).clamp(0.0, 1.0);
+                            let specular = 0.0; //no fancy lighting for now its too laggy
+                            let color = mtl.ka * ambient + mtl.kd * diffuse + mtl.ks * specular;
+
+                            let idx = x * 4;
+                            if idx + 4 <= row.len() {
+                                row[idx..idx + 4].copy_from_slice(&[
+                                    (color.r * 255.0) as u8,
+                                    (color.g * 255.0) as u8,
+                                    (color.b * 255.0) as u8,
+                                    (color.a * 255.0) as u8,
+                                ]);
+                            }
                         }
                     }
                 }
@@ -300,7 +319,7 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
     camera.generate_view_mat()
 }
 
-fn object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> {
+fn _object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> {
     let view_mat = camera.generate_view_mat();
     let view_model = view_mat * model_mat;
     let object_pos = view_model.transform_point(&Point3::origin());
@@ -343,7 +362,7 @@ fn main() -> Result<(), Error> {
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        Pixels::new(WIDTH, HEIGHT, surface_texture)?
+        Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
     let mut world = World::new(
@@ -412,7 +431,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 0.1);
+            handle_keys(&input, &mut world.camera, 0.2);
             window.request_redraw();
         }
     });
