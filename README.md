@@ -11,6 +11,8 @@ You can replace `objects/shuttle.obj` with any .obj file.
 
 Currently everything will be rendered SKYBLUE and polygons of degree >=3 are supported.
 
+NOTE: none of the premade meshes are currently working. I did some major refactoring.
+
 ## Examples
 
 ![lamp](imgs/lamp.gif)
