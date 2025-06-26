@@ -2,7 +2,7 @@ mod mesh;
 
 use mesh::Vertex;
 //use mesh::premade::p_hack::PHackMesh;
-use mesh::{Color, Mesh, Triangle};
+use mesh::{Mesh, Triangle};
 
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
 use ordered_float::OrderedFloat;
@@ -18,6 +18,7 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use crate::mesh::loader::GenericMesh;
+use crate::mesh::Material;
 
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
@@ -133,6 +134,7 @@ impl World {
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
                     normal: normal_mat * vertex.normal,
+                    texcoord: Point2::new(0.0, 0.0),
                 });
             }
 
@@ -161,7 +163,7 @@ impl World {
                 let n3 = transformed_verts[tri.v3].normal;
 
                 if is_front_facing(s1, s2, s3) {
-                    self.draw_triangle(s1, s2, s3, &tri.color, frame, n1, n2, n3);
+                    self.draw_triangle(s1, s2, s3, &tri.mtl, frame, n1, n2, n3);
                 }
             }
             screen_verts.clear();
@@ -175,7 +177,7 @@ impl World {
         t1: Point2<f32>,
         t2: Point2<f32>,
         t3: Point2<f32>,
-        color: &Color,
+        mtl: &Material,
         frame: &mut [u8],
         n1: Vector3<f32>,
         n2: Vector3<f32>,
@@ -233,18 +235,16 @@ impl World {
                             diffuse
                         };
                         let specular = 0.0; //no fancy lighting for now its too laggy
-                        let coloring = ambient + diffuse + specular;
-                        let p_color = Color {
-                            r: ((color.r as f32) * coloring) as u8,
-                            g: ((color.g as f32) * coloring) as u8,
-                            b: ((color.b as f32) * coloring) as u8,
-                            a: color.a,
-                        };
+                        let color = mtl.ka * ambient + mtl.kd * diffuse + mtl.ks * specular;
 
                         let idx = (x as usize) * 4;
                         if idx + 4 <= row.len() {
-                            row[idx..idx + 4]
-                                .copy_from_slice(&[p_color.r, p_color.g, p_color.b, p_color.a]);
+                            row[idx..idx + 4].copy_from_slice(&[
+                                (color.r * 255.0) as u8,
+                                (color.g * 255.0) as u8,
+                                (color.b * 255.0) as u8,
+                                (color.a * 255.0) as u8,
+                            ]);
                         }
                     }
                 }
@@ -293,6 +293,9 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
         delta -= delta.dot(&camera.up) * camera.up;
         delta = delta.normalize() * move_speed;
         camera_shift(camera, delta);
+    } else if input.key_pressed(KeyCode::Space) {
+        camera.position.y += 0.2;
+        camera.position.y += 0.2;
     }
     camera.generate_view_mat()
 }
@@ -320,7 +323,6 @@ fn main() -> Result<(), Error> {
         std::process::exit(1);
     });
     info!("Done loading mesh for {}", filename);
-
     let mut input = WinitInputHelper::new();
     let event_loop = EventLoop::new().unwrap();
     let window = {
@@ -356,7 +358,7 @@ fn main() -> Result<(), Error> {
             position: Point3::new(0.0, 1.0, 5.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
-            ambient: 0.5,
+            ambient: 0.9,
         },
         Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
         vec![Object {
@@ -410,7 +412,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 0.3);
+            handle_keys(&input, &mut world.camera, 0.1);
             window.request_redraw();
         }
     });
