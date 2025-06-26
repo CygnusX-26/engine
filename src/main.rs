@@ -367,7 +367,7 @@ fn main() -> Result<(), Error> {
 
     let mut world = World::new(
         Camera {
-            position: Point3::new(0.0, 0.0, -10.0),
+            position: Point3::new(0.0, 0.0, -1.0),
             target: Point3::new(0.0, 0.0, 0.0),
             up: Vector3::new(0.0, 1.0, 0.0),
             pitch: 0.0,
