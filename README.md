@@ -1,6 +1,6 @@
 # Engine
 
-A super basic graphics engine that can render .objs i've been working on as both my first rust project (and a way to kill time at work).
+A super basic graphics engine written completely from scratch that can render .objs i've been working on as both my first rust project (and a way to kill time at work).
 
 ## Run
 
