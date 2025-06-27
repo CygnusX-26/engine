@@ -235,9 +235,15 @@ impl GenericMesh {
                         file_name
                     ))?;
                 }
-                Some("Ka") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
-                Some("Kd") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
-                Some("Ks") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
+                Some("Ka") => {
+                    cur_mtl.ka = color_from_line(&mut components, lineno + 1, file_name)?;
+                }
+                Some("Kd") => {
+                    cur_mtl.kd = color_from_line(&mut components, lineno + 1, file_name)?;
+                }
+                Some("Ks") => {
+                    cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?;
+                }
                 Some("d") | Some("Tr") => {
                     cur_mtl.transparency = components
                         .next()
