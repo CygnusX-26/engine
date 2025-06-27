@@ -2,8 +2,8 @@ mod mesh;
 
 use mesh::loader::GenericMesh;
 use mesh::Material;
-use mesh::Vertex;
 use mesh::Mesh;
+use mesh::Vertex;
 
 use log::{error, info};
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3, Vector4};
@@ -132,7 +132,7 @@ impl World {
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
                     normal: normal_mat * vertex.normal,
-                    texcoord: Point2::new(0.0, 0.0),
+                    texcoord: Point3::new(0.0, 0.0, 0.0),
                 });
             }
 

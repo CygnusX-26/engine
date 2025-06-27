@@ -22,8 +22,9 @@ impl GenericMesh {
         let mut verts: Vec<Point3<f32>> = vec![];
         let mut normals: Vec<Vector3<f32>> = vec![];
         let mut tris: Vec<Triangle> = vec![];
+        let mut texture_coords: Vec<Point3<f32>> = vec![];
         let mut mtl_map: HashMap<String, Material> = HashMap::new();
-        let mut cur_mtl = Material::new();
+        let mut cur_mtl = Default::default();
 
         for (lineno, line) in read_to_string(file_name)?.lines().enumerate() {
             let mut components = line.split_whitespace();
@@ -31,22 +32,36 @@ impl GenericMesh {
                 Some("mtllib") => {
                     let filename = components
                         .next()
-                        .ok_or(format!("Missing mtl filename at line: {}", lineno))?;
+                        .ok_or(format!("Missing mtl filename at line: {}", lineno + 1))?;
                     GenericMesh::parse_mtl(filename, &mut mtl_map)
-                        .map_err(|e| format!("Failed to parse MTL: at line: {}", lineno))?;
+                        .map_err(|e| format!("Failed to parse MTL: at line: {}", lineno + 1))?;
                 }
                 Some("usemtl") => {
                     let mtl_name = components
                         .next()
-                        .ok_or(format!("Missing material name at line: {}", lineno))?;
+                        .ok_or(format!("Missing material name at line: {}", lineno + 1))?;
                     cur_mtl = mtl_map
                         .get(mtl_name)
-                        .ok_or(format!("Invalid material name at line: {}", lineno))?
+                        .ok_or(format!("Invalid material name at line: {}", lineno + 1))?
                         .clone();
                 }
-                Some("s") => {
-                    //TODO not implemented
-                    continue;
+                Some("vt") => {
+                    let u: f32 = components
+                        .next()
+                        .ok_or(format!(
+                            "Missing first texture component at line: {}",
+                            lineno + 1
+                        ))?
+                        .parse()?;
+                    let v: f32 = match components.next() {
+                        Some(v) => v.parse()?,
+                        None => 0.0,
+                    };
+                    let w: f32 = match components.next() {
+                        Some(w) => w.parse()?,
+                        None => 0.0,
+                    };
+                    texture_coords.push(Point3::new(u, v, w));
                 }
                 Some("v") => {
                     verts.push(Point3::new(
@@ -99,31 +114,53 @@ impl GenericMesh {
                     ));
                 }
                 Some("f") => {
-                    let mut poly_verts: Vec<usize> = vec![];
+                    let mut poly_verts: Vec<(usize, usize)> = vec![];
 
                     for _ in 0..2 {
-                        poly_verts.push(
-                            components
-                                .next()
-                                .ok_or(format!("Missing vertex at line: {}", lineno + 1))?
-                                .split("/")
+                        let mut face_iter = components
+                            .next()
+                            .ok_or(format!("Missing vertex at line: {}", lineno + 1))?
+                            .split("/");
+                        poly_verts.push((
+                            face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
                                 .parse::<usize>()?
                                 - 1,
-                        );
+                            match face_iter.next() {
+                                Some(vt) => {
+                                    if vt.is_empty() {
+                                        0
+                                    } else {
+                                        vt.parse::<usize>()? - 1
+                                    }
+                                }
+                                None => 0,
+                            },
+                        ));
                     }
 
                     // We ensure that every polygon has at LEAST three verticies.
                     // Now collect the rest :)
                     for comp in components {
-                        poly_verts.push(
-                            comp.split("/")
+                        let mut face_iter = comp.split("/");
+                        poly_verts.push((
+                            face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
                                 .parse::<usize>()?
                                 - 1,
-                        );
+                            match face_iter.next() {
+                                Some(vt) => {
+                                    if vt.is_empty() {
+                                        0
+                                    } else {
+                                        vt.parse::<usize>()? - 1
+                                    }
+                                }
+                                None => 0,
+                            },
+                        ));
                     }
 
                     for tri in clip_ears(&mut poly_verts, &cur_mtl) {
@@ -133,13 +170,22 @@ impl GenericMesh {
                 _ => continue,
             }
         }
+
+        let max_len = verts.len().max(normals.len()).max(texture_coords.len());
+
+        verts.resize(max_len, Point3::origin());
+        normals.resize(max_len, Vector3::zeros());
+        texture_coords.resize(max_len, Point3::origin());
+
         let mut vertices: Vec<Vertex> = verts
             .into_iter()
-            .map(|v| -> Vertex {
+            .zip(normals)
+            .zip(texture_coords)
+            .map(|((v, n), t)| -> Vertex {
                 Vertex {
                     position: v,
-                    normal: Vector3::zeros(),
-                    texcoord: Point2::new(0.0, 0.0),
+                    normal: n,
+                    texcoord: t,
                 }
             })
             .collect();
@@ -148,7 +194,6 @@ impl GenericMesh {
             let i0 = triangle.v1;
             let i1 = triangle.v2;
             let i2 = triangle.v3;
-
             let v0 = vertices[i0].position;
             let v1 = vertices[i1].position;
             let v2 = vertices[i2].position;
@@ -174,7 +219,7 @@ impl GenericMesh {
         mtl_map: &mut HashMap<String, Material>,
     ) -> Result<(), Box<dyn Error>> {
         let mut cur_mtl_name = "";
-        let mut cur_mtl = Material::new();
+        let mut cur_mtl = Default::default();
         let binding = read_to_string(file_name)?;
         for (lineno, line) in binding.lines().enumerate() {
             let mut components = line.split_whitespace();
@@ -182,28 +227,24 @@ impl GenericMesh {
                 Some("newmtl") => {
                     if !cur_mtl_name.is_empty() {
                         mtl_map.insert(String::from(cur_mtl_name), cur_mtl);
-                        cur_mtl = Material::new();
+                        cur_mtl = Default::default();
                     }
                     cur_mtl_name = components.next().ok_or(format!(
                         "Missing mtl name at line: {} in file {}",
-                        lineno, file_name
+                        lineno + 1,
+                        file_name
                     ))?;
                 }
-                Some("Ka") => {
-                    cur_mtl.ka = color_from_line(&mut components, lineno, file_name)?;
-                }
-                Some("Kd") => {
-                    cur_mtl.kd = color_from_line(&mut components, lineno, file_name)?;
-                }
-                Some("Ks") => {
-                    cur_mtl.ks = color_from_line(&mut components, lineno, file_name)?;
-                }
+                Some("Ka") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
+                Some("Kd") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
+                Some("Ks") => cur_mtl.ks = color_from_line(&mut components, lineno + 1, file_name)?,
                 Some("d") | Some("Tr") => {
                     cur_mtl.transparency = components
                         .next()
                         .ok_or(format!(
                             "Missing transparency at line: {} in file {}",
-                            lineno, file_name
+                            lineno + 1,
+                            file_name
                         ))?
                         .parse::<f32>()?;
                 }
@@ -214,6 +255,16 @@ impl GenericMesh {
                 Some("Ni") => {
                     // Not supported TODO later
                     continue;
+                }
+                Some("map_Ka") => {
+                    // Not supported TODO later
+                    continue;
+                }
+                Some("map_Kd") => {
+                    // Not supported TODO later
+                }
+                Some("map_Ks") => {
+                    // Not supported TODO later
                 }
                 _ => {
                     continue;
@@ -247,35 +298,41 @@ fn color_from_line(
             .next()
             .ok_or(format!(
                 "Missing r component at line: {} in file {}",
-                lineno, file_name
+                lineno + 1,
+                file_name
             ))?
             .parse::<f32>()?,
         g: components
             .next()
             .ok_or(format!(
                 "Missing g component at line: {} in file {}",
-                lineno, file_name
+                lineno + 1,
+                file_name
             ))?
             .parse::<f32>()?,
         b: components
             .next()
             .ok_or(format!(
                 "Missing b component at line: {} in file {}",
-                lineno, file_name
+                lineno + 1,
+                file_name
             ))?
             .parse::<f32>()?,
         a: 1.0,
     })
 }
 
-fn clip_ears(poly_verts: &mut Vec<usize>, cur_mtl: &Material) -> Vec<Triangle> {
+fn clip_ears(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: &Material) -> Vec<Triangle> {
     let mut tris: Vec<Triangle> = vec![];
     while poly_verts.len() > 2 {
         tris.push(Triangle {
-            v1: poly_verts[1],
-            v2: poly_verts[0],
-            v3: poly_verts[2], // wont work with reversed winding order FIXME later
+            v1: poly_verts[1].0,
+            v2: poly_verts[0].0,
+            v3: poly_verts[2].0, // wont work with reversed winding order FIXME later
             mtl: cur_mtl.clone(),
+            t1: poly_verts[1].1,
+            t2: poly_verts[0].1,
+            t3: poly_verts[2].1,
         });
         poly_verts.remove(1);
     }

@@ -10,7 +10,7 @@ use nalgebra::{Point2, Point3, Vector3};
 pub struct Vertex {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,
-    pub texcoord: Point2<f32>,
+    pub texcoord: Point3<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -18,6 +18,9 @@ pub struct Triangle {
     pub v1: usize,
     pub v2: usize,
     pub v3: usize,
+    pub t1: usize,
+    pub t2: usize,
+    pub t3: usize,
     pub mtl: Material,
 }
 
@@ -37,10 +40,13 @@ pub struct Material {
     pub transparency: f32,
     pub tf: Color,
     pub ni: f32,
+    pub map_ka: String,
+    pub map_kd: String,
+    pub map_ks: String,
 }
 
-impl Material {
-    pub fn new() -> Self {
+impl Default for Material {
+    fn default() -> Self {
         Self {
             ka: SKYBLUE,
             kd: SKYBLUE,
@@ -48,6 +54,9 @@ impl Material {
             transparency: 0.0,
             tf: BLACK,
             ni: 0.0,
+            map_ka: String::with_capacity(10),
+            map_kd: String::with_capacity(10),
+            map_ks: String::with_capacity(10),
         }
     }
 }
