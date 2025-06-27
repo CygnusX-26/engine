@@ -1,6 +1,7 @@
-use nalgebra::{Point2, Point3, Vector3};
+use image::DynamicImage;
+use nalgebra::{Dynamic, Point2, Point3, Vector3};
 
-use crate::mesh::{Color, Material, Mesh, Triangle, Vertex, SKYBLUE};
+use crate::mesh::{Color, Material, Mesh, TextureCoord, Triangle, Vertex, SKYBLUE};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::read_to_string;
@@ -11,18 +12,15 @@ use std::str::SplitWhitespace;
 pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
+    texture_coords: Vec<TextureCoord>,
 }
 
 impl GenericMesh {
     pub fn from_file(file_name: &str) -> Result<Self, Box<dyn Error>> {
-        let mut loaded_mesh: Self = Self {
-            verts: vec![],
-            tris: vec![],
-        };
         let mut verts: Vec<Point3<f32>> = vec![];
         let mut normals: Vec<Vector3<f32>> = vec![];
         let mut tris: Vec<Triangle> = vec![];
-        let mut texture_coords: Vec<Point3<f32>> = vec![];
+        let mut texture_coords: Vec<TextureCoord> = vec![];
         let mut mtl_map: HashMap<String, Material> = HashMap::new();
         let mut cur_mtl = Default::default();
 
@@ -61,7 +59,7 @@ impl GenericMesh {
                         Some(w) => w.parse()?,
                         None => 0.0,
                     };
-                    texture_coords.push(Point3::new(u, v, w));
+                    texture_coords.push(TextureCoord { u, v, w });
                 }
                 Some("v") => {
                     verts.push(Point3::new(
@@ -175,25 +173,22 @@ impl GenericMesh {
 
         verts.resize(max_len, Point3::origin());
         normals.resize(max_len, Vector3::zeros());
-        texture_coords.resize(max_len, Point3::origin());
 
         let mut vertices: Vec<Vertex> = verts
             .into_iter()
             .zip(normals)
-            .zip(texture_coords)
-            .map(|((v, n), t)| -> Vertex {
+            .map(|(v, n)| -> Vertex {
                 Vertex {
                     position: v,
                     normal: n,
-                    texcoord: t,
                 }
             })
             .collect();
 
         for triangle in &tris {
-            let i0 = triangle.v1;
-            let i1 = triangle.v2;
-            let i2 = triangle.v3;
+            let i0 = triangle.v[0];
+            let i1 = triangle.v[1];
+            let i2 = triangle.v[2];
             let v0 = vertices[i0].position;
             let v1 = vertices[i1].position;
             let v2 = vertices[i2].position;
@@ -208,10 +203,12 @@ impl GenericMesh {
         for vertex in &mut vertices {
             vertex.normal = vertex.normal.normalize();
         }
-        loaded_mesh.verts = vertices;
-        loaded_mesh.tris = tris;
 
-        Ok(loaded_mesh)
+        Ok(Self {
+            verts: vertices,
+            tris,
+            texture_coords,
+        })
     }
 
     fn parse_mtl(
@@ -263,14 +260,13 @@ impl GenericMesh {
                     continue;
                 }
                 Some("map_Ka") => {
-                    // Not supported TODO later
-                    continue;
+                    cur_mtl.map_ka = Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 Some("map_Kd") => {
-                    // Not supported TODO later
+                    cur_mtl.map_kd = Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 Some("map_Ks") => {
-                    // Not supported TODO later
+                    cur_mtl.map_ks = Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 _ => {
                     continue;
@@ -292,6 +288,29 @@ impl Mesh for GenericMesh {
     fn verts(&self) -> &[Vertex] {
         &self.verts
     }
+
+    fn texturecoords(&self) -> &[TextureCoord] {
+        &self.texture_coords
+    }
+}
+
+fn open_image_from_line(
+    components: &mut SplitWhitespace,
+    lineno: usize,
+    file_name: &str,
+) -> Result<DynamicImage, Box<dyn Error>> {
+    image::open(components.next().ok_or(format!(
+        "Missing image filename at line: {} in file {}",
+        lineno + 1,
+        file_name
+    ))?)
+    .map_err(|e| {
+        Box::<dyn Error>::from(format!(
+            "Failed to open file at line: {} in file {}",
+            lineno + 1,
+            file_name
+        ))
+    })
 }
 
 fn color_from_line(
@@ -332,13 +351,9 @@ fn clip_ears(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: &Material) -> Vec<Tr
     let mut tris: Vec<Triangle> = vec![];
     while poly_verts.len() > 2 {
         tris.push(Triangle {
-            v1: poly_verts[1].0,
-            v2: poly_verts[0].0,
-            v3: poly_verts[2].0, // wont work with reversed winding order FIXME later
+            v: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order FIXME later
             mtl: cur_mtl.clone(),
-            t1: poly_verts[1].1,
-            t2: poly_verts[0].1,
-            t3: poly_verts[2].1,
+            t: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
         });
         poly_verts.remove(1);
     }

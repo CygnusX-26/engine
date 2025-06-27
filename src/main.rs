@@ -132,37 +132,33 @@ impl World {
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
                     normal: normal_mat * vertex.normal,
-                    texcoord: Point3::new(0.0, 0.0, 0.0),
                 });
             }
 
             // Draw the triangles
             for tri in model.tris() {
-                let s1 = screen_verts[tri.v1];
-                let s2 = screen_verts[tri.v2];
-                let s3 = screen_verts[tri.v3];
+                let vert1_index = tri.v[0];
+                let vert2_index = tri.v[1];
+                let vert3_index = tri.v[2];
+                let s1 = screen_verts[vert1_index];
+                let s2 = screen_verts[vert2_index];
+                let s3 = screen_verts[vert3_index];
                 if !s1.x.is_finite() || !s2.x.is_finite() || !s3.x.is_finite() {
                     continue;
                 }
 
                 if is_front_facing(s1, s2, s3) {
-                    let n1 = transformed_verts[tri.v1].normal;
-                    let n2 = transformed_verts[tri.v2].normal;
-                    let n3 = transformed_verts[tri.v3].normal;
+                    let n1 = transformed_verts[vert1_index].normal;
+                    let n2 = transformed_verts[vert2_index].normal;
+                    let n3 = transformed_verts[vert3_index].normal;
 
-                    let z1 = zvalues[tri.v1];
-                    let z2 = zvalues[tri.v2];
-                    let z3 = zvalues[tri.v3];
+                    let z1 = zvalues[vert1_index];
+                    let z2 = zvalues[vert2_index];
+                    let z3 = zvalues[vert3_index];
                     self.draw_triangle(
-                        s1,
-                        s2,
-                        s3,
-                        n1,
-                        n2,
-                        n3,
-                        z1,
-                        z2,
-                        z3,
+                        [s1, s2, s3],
+                        [n1, n2, n3],
+                        [z1, z2, z3],
                         &tri.mtl,
                         frame,
                         &mut zbuffer,
@@ -177,24 +173,24 @@ impl World {
 
     fn draw_triangle(
         &self,
-        t1: Point2<f32>,
-        t2: Point2<f32>,
-        t3: Point2<f32>,
-        n1: Vector3<f32>,
-        n2: Vector3<f32>,
-        n3: Vector3<f32>,
-        z1: f32,
-        z2: f32,
-        z3: f32,
+        screen_verts: [Point2<f32>; 3],
+        normals: [Vector3<f32>; 3],
+        z_values: [f32; 3],
         mtl: &Material,
         frame: &mut [u8],
         zbuffer: &mut [AtomicU32],
     ) {
+        let z1 = z_values[0];
+        let z2 = z_values[1];
+        let z3 = z_values[2];
+        let n1 = normals[0];
+        let n2 = normals[1];
+        let n3 = normals[2];
         let light_dir = (self.light.target - self.light.position).normalize();
         let ambient = self.light.ambient;
-        let (x1, y1) = (t1.x, t1.y);
-        let (x2, y2) = (t2.x, t2.y);
-        let (x3, y3) = (t3.x, t3.y);
+        let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
+        let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
+        let (x3, y3) = (screen_verts[2].x, screen_verts[2].y);
         let min_x = (x1.min(x2).min(x3).max(0.0)) as usize;
         let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as usize;
         let min_y = (y1.min(y2).min(y3).max(0.0)) as usize;
@@ -231,11 +227,11 @@ impl World {
                     let mut w2 = edge((x3, y3), (x1, y1), p);
                     let mut w3 = edge((x1, y1), (x2, y2), p);
                     if w1 >= 0.0 && w2 >= 0.0 && w3 >= 0.0 {
-                        let sum = w1 + w2 + w3;
+                        let area = w1 + w2 + w3;
 
-                        w1 /= sum;
-                        w2 /= sum;
-                        w3 /= sum;
+                        w1 /= area;
+                        w2 /= area;
+                        w3 /= area;
 
                         let current_z = &zbuffer[z_index];
                         let current_z_bits = current_z.load(Ordering::Relaxed);

@@ -4,23 +4,32 @@ pub mod premade;
 
 use std::ops::{Add, Mul};
 
+use image::DynamicImage;
 use nalgebra::{Point2, Point3, Vector3};
+
+pub trait Mesh: Sync {
+    fn verts(&self) -> &[Vertex];
+    fn tris(&self) -> &[Triangle];
+    fn texturecoords(&self) -> &[TextureCoord];
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct TextureCoord {
+    pub u: f32,
+    pub v: f32,
+    pub w: f32,
+}
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vertex {
     pub position: Point3<f32>,
     pub normal: Vector3<f32>,
-    pub texcoord: Point3<f32>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Triangle {
-    pub v1: usize,
-    pub v2: usize,
-    pub v3: usize,
-    pub t1: usize,
-    pub t2: usize,
-    pub t3: usize,
+    pub v: [usize; 3], // vertex indicies
+    pub t: [usize; 3], // texture indicies
     pub mtl: Material,
 }
 
@@ -40,9 +49,9 @@ pub struct Material {
     pub transparency: f32,
     pub tf: Color,
     pub ni: f32,
-    pub map_ka: String,
-    pub map_kd: String,
-    pub map_ks: String,
+    pub map_ka: Option<DynamicImage>,
+    pub map_kd: Option<DynamicImage>,
+    pub map_ks: Option<DynamicImage>,
 }
 
 impl Default for Material {
@@ -54,9 +63,9 @@ impl Default for Material {
             transparency: 0.0,
             tf: BLACK,
             ni: 0.0,
-            map_ka: String::with_capacity(10),
-            map_kd: String::with_capacity(10),
-            map_ks: String::with_capacity(10),
+            map_ka: None,
+            map_kd: None,
+            map_ks: None,
         }
     }
 }
@@ -85,11 +94,6 @@ impl Add<Color> for Color {
             a: self.a,
         }
     }
-}
-
-pub trait Mesh: Sync {
-    fn verts(&self) -> &[Vertex];
-    fn tris(&self) -> &[Triangle];
 }
 
 pub const RED: Color = Color {
