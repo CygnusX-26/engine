@@ -1,5 +1,7 @@
 mod mesh;
 
+use image::GenericImageView;
+use image::Pixel;
 use mesh::loader::GenericMesh;
 use mesh::Material;
 use mesh::Mesh;
@@ -18,6 +20,9 @@ use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
+
+use crate::mesh::Color;
+use crate::mesh::TextureCoord;
 
 const WIDTH: usize = 500;
 const HEIGHT: usize = 500;
@@ -99,6 +104,7 @@ impl World {
 
         let mut screen_verts: Vec<Point2<f32>> = vec![];
         let mut zvalues: Vec<f32> = vec![];
+        let mut wvalues: Vec<f32> = vec![];
         let mut zbuffer: Vec<AtomicU32> = (0..WIDTH * HEIGHT)
             .map(|_| AtomicU32::new(f32::to_bits(1.0)))
             .collect();
@@ -120,6 +126,7 @@ impl World {
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
                 let ndc_z = persproj.z / persproj.w;
+                let ndc_w = 1.0 / persproj.w;
 
                 if !(0.0..=1.0).contains(&ndc_z) {
                     screen_verts.push(Point2::new(f32::NAN, f32::NAN));
@@ -128,6 +135,7 @@ impl World {
                     let screen_y = (1.0 - ndc_y) * 0.5 * HEIGHT as f32;
                     screen_verts.push(Point2::new(screen_x, screen_y));
                 }
+                wvalues.push(ndc_w);
                 zvalues.push(ndc_z);
                 transformed_verts.push(Vertex {
                     position: Point3::from((model_mat * Vector4::from(vertex.position)).xyz()),
@@ -137,9 +145,9 @@ impl World {
 
             // Draw the triangles
             for tri in model.tris() {
-                let vert1_index = tri.v[0];
-                let vert2_index = tri.v[1];
-                let vert3_index = tri.v[2];
+                let vert1_index = tri.verts[0];
+                let vert2_index = tri.verts[1];
+                let vert3_index = tri.verts[2];
                 let s1 = screen_verts[vert1_index];
                 let s2 = screen_verts[vert2_index];
                 let s3 = screen_verts[vert3_index];
@@ -148,6 +156,7 @@ impl World {
                 }
 
                 if is_front_facing(s1, s2, s3) {
+                    let texture_coords = mesh.mesh.texturecoords();
                     let n1 = transformed_verts[vert1_index].normal;
                     let n2 = transformed_verts[vert2_index].normal;
                     let n3 = transformed_verts[vert3_index].normal;
@@ -155,10 +164,24 @@ impl World {
                     let z1 = zvalues[vert1_index];
                     let z2 = zvalues[vert2_index];
                     let z3 = zvalues[vert3_index];
+
+                    let w1 = wvalues[vert1_index];
+                    let w2 = wvalues[vert2_index];
+                    let w3 = wvalues[vert3_index];
+
+                    let t1 = texture_coords.get(tri.texes[0]);
+                    let t2 = texture_coords.get(tri.texes[1]);
+                    let t3 = texture_coords.get(tri.texes[2]);
+
                     self.draw_triangle(
                         [s1, s2, s3],
                         [n1, n2, n3],
                         [z1, z2, z3],
+                        match (t1, t2, t3) {
+                            (Some(tc1), Some(tc2), Some(tc3)) => Some([*tc1, *tc2, *tc3]),
+                            _ => None,
+                        },
+                        [w1, w2, w3],
                         &tri.mtl,
                         frame,
                         &mut zbuffer,
@@ -176,6 +199,8 @@ impl World {
         screen_verts: [Point2<f32>; 3],
         normals: [Vector3<f32>; 3],
         z_values: [f32; 3],
+        texture_coords: Option<[TextureCoord; 3]>,
+        w_values: [f32; 3],
         mtl: &Material,
         frame: &mut [u8],
         zbuffer: &mut [AtomicU32],
@@ -183,6 +208,9 @@ impl World {
         let z1 = z_values[0];
         let z2 = z_values[1];
         let z3 = z_values[2];
+        let perspective_warp_1 = w_values[0];
+        let perspective_warp_2 = w_values[1];
+        let perspective_warp_3 = w_values[2];
         let n1 = normals[0];
         let n2 = normals[1];
         let n3 = normals[2];
@@ -246,10 +274,68 @@ impl World {
                                 )
                                 .is_ok()
                         {
+                            let mut ka = mtl.ka;
+                            let mut kd = mtl.kd;
+                            let mut ks = mtl.ks;
+
+                            if let Some([uv1, uv2, uv3]) = texture_coords {
+                                let u_over_z = w1 * uv1.u * perspective_warp_1
+                                    + w2 * uv2.u * perspective_warp_2
+                                    + w3 * uv3.u * perspective_warp_3;
+                                let v_over_z = w1 * uv1.v * perspective_warp_1
+                                    + w2 * uv2.v * perspective_warp_2
+                                    + w3 * uv3.v * perspective_warp_3;
+                                let one_over_z = w1 * perspective_warp_1
+                                    + w2 * perspective_warp_2
+                                    + w3 * perspective_warp_3;
+
+                                let interpolated_u = (u_over_z / one_over_z).clamp(0.0, 1.0);
+                                let interpolated_v = 1.0 - (v_over_z / one_over_z).clamp(0.0, 1.0);
+
+                                if let Some(ref tex) = mtl.map_ka {
+                                    let u =
+                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
+                                    let v =
+                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
+                                    let pixel = tex.get_pixel(u, v).to_rgb();
+                                    ka = Color {
+                                        r: pixel[0] as f32 / 255.0,
+                                        g: pixel[1] as f32 / 255.0,
+                                        b: pixel[2] as f32 / 255.0,
+                                        a: 1.0,
+                                    }
+                                }
+                                if let Some(ref tex) = mtl.map_kd {
+                                    let u =
+                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
+                                    let v =
+                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
+                                    let pixel = tex.get_pixel(u, v).to_rgb();
+                                    kd = Color {
+                                        r: pixel[0] as f32 / 255.0,
+                                        g: pixel[1] as f32 / 255.0,
+                                        b: pixel[2] as f32 / 255.0,
+                                        a: 1.0,
+                                    }
+                                }
+                                if let Some(ref tex) = mtl.map_ks {
+                                    let u =
+                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
+                                    let v =
+                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
+                                    let pixel = tex.get_pixel(u, v).to_rgb();
+                                    ks = Color {
+                                        r: pixel[0] as f32 / 255.0,
+                                        g: pixel[1] as f32 / 255.0,
+                                        b: pixel[2] as f32 / 255.0,
+                                        a: 1.0,
+                                    }
+                                }
+                            }
                             let interpolated_normal = w1 * n1 + w2 * n2 + w3 * n3;
                             let diffuse = light_dir.dot(&interpolated_normal).clamp(0.0, 1.0);
                             let specular = 0.0; //no fancy lighting for now its too laggy
-                            let color = mtl.ka * ambient + mtl.kd * diffuse + mtl.ks * specular;
+                            let color = ka * ambient + kd * diffuse + ks * specular;
 
                             let idx = x * 4;
                             if idx + 4 <= row.len() {

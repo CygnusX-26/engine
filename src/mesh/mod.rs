@@ -28,8 +28,8 @@ pub struct Vertex {
 
 #[derive(Debug, Clone)]
 pub struct Triangle {
-    pub v: [usize; 3], // vertex indicies
-    pub t: [usize; 3], // texture indicies
+    pub verts: [usize; 3], // vertex indicies
+    pub texes: [usize; 3], // texture indicies
     pub mtl: Material,
 }
 

@@ -1,5 +1,6 @@
 use image::DynamicImage;
-use nalgebra::{Dynamic, Point2, Point3, Vector3};
+use log::info;
+use nalgebra::{Point2, Point3, Vector3};
 
 use crate::mesh::{Color, Material, Mesh, TextureCoord, Triangle, Vertex, SKYBLUE};
 use std::collections::HashMap;
@@ -25,14 +26,16 @@ impl GenericMesh {
         let mut cur_mtl = Default::default();
 
         for (lineno, line) in read_to_string(file_name)?.lines().enumerate() {
+            if lineno % 1000 == 0 {
+                info!("loading line: {}", lineno);
+            }
             let mut components = line.split_whitespace();
             match components.next() {
                 Some("mtllib") => {
                     let filename = components
                         .next()
                         .ok_or(format!("Missing mtl filename at line: {}", lineno + 1))?;
-                    GenericMesh::parse_mtl(filename, &mut mtl_map)
-                        .map_err(|e| format!("Failed to parse MTL: at line: {}", lineno + 1))?;
+                    GenericMesh::parse_mtl(filename, &mut mtl_map)?
                 }
                 Some("usemtl") => {
                     let mtl_name = components
@@ -186,9 +189,9 @@ impl GenericMesh {
             .collect();
 
         for triangle in &tris {
-            let i0 = triangle.v[0];
-            let i1 = triangle.v[1];
-            let i2 = triangle.v[2];
+            let i0 = triangle.verts[0];
+            let i1 = triangle.verts[1];
+            let i2 = triangle.verts[2];
             let v0 = vertices[i0].position;
             let v1 = vertices[i1].position;
             let v2 = vertices[i2].position;
@@ -260,13 +263,16 @@ impl GenericMesh {
                     continue;
                 }
                 Some("map_Ka") => {
-                    cur_mtl.map_ka = Some(open_image_from_line(&mut components, lineno, file_name)?);
+                    cur_mtl.map_ka =
+                        Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 Some("map_Kd") => {
-                    cur_mtl.map_kd = Some(open_image_from_line(&mut components, lineno, file_name)?);
+                    cur_mtl.map_kd =
+                        Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 Some("map_Ks") => {
-                    cur_mtl.map_ks = Some(open_image_from_line(&mut components, lineno, file_name)?);
+                    cur_mtl.map_ks =
+                        Some(open_image_from_line(&mut components, lineno, file_name)?);
                 }
                 _ => {
                     continue;
@@ -351,9 +357,9 @@ fn clip_ears(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: &Material) -> Vec<Tr
     let mut tris: Vec<Triangle> = vec![];
     while poly_verts.len() > 2 {
         tris.push(Triangle {
-            v: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order FIXME later
+            verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order FIXME later
             mtl: cur_mtl.clone(),
-            t: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
+            texes: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
         });
         poly_verts.remove(1);
     }
