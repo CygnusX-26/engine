@@ -2,7 +2,7 @@
 pub mod loader;
 pub mod premade;
 
-use std::ops::{Add, Mul};
+use std::{ops::{Add, Mul}, sync::Arc};
 
 use image::DynamicImage;
 use nalgebra::{Point2, Point3, Vector3};
@@ -30,7 +30,7 @@ pub struct Vertex {
 pub struct Triangle {
     pub verts: [usize; 3], // vertex indicies
     pub texes: [usize; 3], // texture indicies
-    pub mtl: Material,
+    pub mtl: Arc<Material>,
 }
 
 #[derive(Debug, Clone, Copy)]

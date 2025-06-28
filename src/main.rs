@@ -292,6 +292,7 @@ impl World {
                                 let interpolated_u = (u_over_z / one_over_z).clamp(0.0, 1.0);
                                 let interpolated_v = 1.0 - (v_over_z / one_over_z).clamp(0.0, 1.0);
 
+                                // TODO refactor this code to be more efficient... (it works for now i sleep...)
                                 if let Some(ref tex) = mtl.map_ka {
                                     let u =
                                         (interpolated_u * (tex.width() - 1) as f32).round() as u32;
@@ -452,7 +453,7 @@ fn main() -> Result<(), Error> {
 
     let mut world = World::new(
         Camera {
-            position: Point3::new(0.0, 0.0, -1.0),
+            position: Point3::new(0.0, 0.0, -10.0),
             target: Point3::new(0.0, 0.0, 0.0),
             up: Vector3::new(0.0, 1.0, 0.0),
             pitch: 0.0,

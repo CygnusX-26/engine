@@ -8,12 +8,13 @@ use std::error::Error;
 use std::fs::read_to_string;
 use std::hash::Hash;
 use std::str::SplitWhitespace;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
-    texture_coords: Vec<TextureCoord>,
+    texture_coords: Vec<TextureCoord>
 }
 
 impl GenericMesh {
@@ -22,12 +23,15 @@ impl GenericMesh {
         let mut normals: Vec<Vector3<f32>> = vec![];
         let mut tris: Vec<Triangle> = vec![];
         let mut texture_coords: Vec<TextureCoord> = vec![];
-        let mut mtl_map: HashMap<String, Material> = HashMap::new();
-        let mut cur_mtl = Default::default();
+
+        let mut mtl_map: HashMap<String, Arc<Material>> = HashMap::new();
+        mtl_map.insert(String::from("__default__"), Arc::new(Default::default()));
+        let mut cur_mtl = "__default__";
+
 
         for (lineno, line) in read_to_string(file_name)?.lines().enumerate() {
             if lineno % 1000 == 0 {
-                info!("loading line: {}", lineno);
+                info!("loading : {}", lineno);
             }
             let mut components = line.split_whitespace();
             match components.next() {
@@ -38,13 +42,9 @@ impl GenericMesh {
                     GenericMesh::parse_mtl(filename, &mut mtl_map)?
                 }
                 Some("usemtl") => {
-                    let mtl_name = components
+                    cur_mtl = components
                         .next()
                         .ok_or(format!("Missing material name at line: {}", lineno + 1))?;
-                    cur_mtl = mtl_map
-                        .get(mtl_name)
-                        .ok_or(format!("Invalid material name at line: {}", lineno + 1))?
-                        .clone();
                 }
                 Some("vt") => {
                     let u: f32 = components
@@ -164,7 +164,9 @@ impl GenericMesh {
                         ));
                     }
 
-                    for tri in clip_ears(&mut poly_verts, &cur_mtl) {
+                    let material = mtl_map.get(cur_mtl).ok_or(format!("Couldn't find material at line: {} in file: {}", lineno + 1, file_name))?.clone();
+
+                    for tri in clip_ears(&mut poly_verts, material) {
                         tris.push(tri);
                     }
                 }
@@ -216,17 +218,17 @@ impl GenericMesh {
 
     fn parse_mtl(
         file_name: &str,
-        mtl_map: &mut HashMap<String, Material>,
+        mtl_map: &mut HashMap<String, Arc<Material>>,
     ) -> Result<(), Box<dyn Error>> {
         let mut cur_mtl_name = "";
-        let mut cur_mtl = Default::default();
+        let mut cur_mtl: Material = Default::default();
         let binding = read_to_string(file_name)?;
         for (lineno, line) in binding.lines().enumerate() {
             let mut components = line.split_whitespace();
             match components.next() {
                 Some("newmtl") => {
                     if !cur_mtl_name.is_empty() {
-                        mtl_map.insert(String::from(cur_mtl_name), cur_mtl);
+                        mtl_map.insert(String::from(cur_mtl_name), Arc::new(cur_mtl));
                         cur_mtl = Default::default();
                     }
                     cur_mtl_name = components.next().ok_or(format!(
@@ -280,7 +282,7 @@ impl GenericMesh {
             }
         }
         if !cur_mtl_name.is_empty() {
-            mtl_map.insert(String::from(cur_mtl_name), cur_mtl);
+            mtl_map.insert(String::from(cur_mtl_name), Arc::new(cur_mtl));
         }
         Ok(())
     }
@@ -353,11 +355,11 @@ fn color_from_line(
     })
 }
 
-fn clip_ears(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: &Material) -> Vec<Triangle> {
+fn clip_ears<'a>(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: Arc<Material>) -> Vec<Triangle> {
     let mut tris: Vec<Triangle> = vec![];
     while poly_verts.len() > 2 {
         tris.push(Triangle {
-            verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order FIXME later
+            verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order TODO later
             mtl: cur_mtl.clone(),
             texes: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
         });
