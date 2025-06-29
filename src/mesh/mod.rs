@@ -2,7 +2,10 @@
 pub mod loader;
 pub mod premade;
 
-use std::{ops::{Add, Mul}, sync::Arc};
+use std::{
+    ops::{Add, Mul},
+    sync::Arc,
+};
 
 use image::DynamicImage;
 use nalgebra::{Point2, Point3, Vector3};

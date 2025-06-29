@@ -1,12 +1,15 @@
 use image::DynamicImage;
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::info;
 use nalgebra::{Point2, Point3, Vector3};
 
 use crate::mesh::{Color, Material, Mesh, TextureCoord, Triangle, Vertex, SKYBLUE};
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::read_to_string;
+use std::fmt::Write;
+use std::fs::{read_to_string, File};
 use std::hash::Hash;
+use std::io::{BufRead, BufReader};
 use std::str::SplitWhitespace;
 use std::sync::Arc;
 
@@ -14,7 +17,7 @@ use std::sync::Arc;
 pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
-    texture_coords: Vec<TextureCoord>
+    texture_coords: Vec<TextureCoord>,
 }
 
 impl GenericMesh {
@@ -28,11 +31,26 @@ impl GenericMesh {
         mtl_map.insert(String::from("__default__"), Arc::new(Default::default()));
         let mut cur_mtl = "__default__";
 
+        let file =
+            File::open(file_name).map_err(|e| format!("Couldn't open file: {}", file_name))?;
+        let reader = BufReader::new(file);
+        let total_lines = reader.lines().count();
+
+        let pb = ProgressBar::new(total_lines as u64);
+        pb.set_style(
+            ProgressStyle::with_template(
+                "{msg:.magenta} {spinner:.green} [{bar:.cyan/blue}] {pos}/{len} ({elapsed})",
+            )
+            .unwrap()
+            .tick_strings(&[
+                " ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▄", "▃", "▂",
+            ])
+            .progress_chars("#>-"),
+        );
+        pb.set_message(file_name.to_owned());
 
         for (lineno, line) in read_to_string(file_name)?.lines().enumerate() {
-            if lineno % 1000 == 0 {
-                info!("loading : {}", lineno);
-            }
+            pb.set_position(lineno as u64);
             let mut components = line.split_whitespace();
             match components.next() {
                 Some("mtllib") => {
@@ -53,13 +71,18 @@ impl GenericMesh {
                             "Missing first texture component at line: {}",
                             lineno + 1
                         ))?
-                        .parse()?;
+                        .parse()
+                        .map_err(|e| format!("Invalid f32 for u at line: {}", lineno + 1))?;
                     let v: f32 = match components.next() {
-                        Some(v) => v.parse()?,
+                        Some(v) => v
+                            .parse()
+                            .map_err(|e| format!("Invalid f32 for v at line: {}", lineno + 1))?,
                         None => 0.0,
                     };
                     let w: f32 = match components.next() {
-                        Some(w) => w.parse()?,
+                        Some(w) => w
+                            .parse()
+                            .map_err(|e| format!("Invalid f32 for w at line: {}", lineno + 1))?,
                         None => 0.0,
                     };
                     texture_coords.push(TextureCoord { u, v, w });
@@ -72,21 +95,30 @@ impl GenericMesh {
                                 "Missing first vertex component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| {
+                                format!("Invalid first digit for vertex at line: {}", lineno + 1)
+                            })?,
                         components
                             .next()
                             .ok_or(format!(
                                 "Missing second vertex component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| {
+                                format!("Invalid second digit for vertex at line: {}", lineno + 1)
+                            })?,
                         components
                             .next()
                             .ok_or(format!(
                                 "Missing third vertex component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| {
+                                format!("Invalid third digit for vertex at line: {}", lineno + 1)
+                            })?,
                     ));
                 }
                 Some("vn") => {
@@ -97,21 +129,24 @@ impl GenericMesh {
                                 "Missing first normal component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
                         components
                             .next()
                             .ok_or(format!(
                                 "Missing second normal component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
                         components
                             .next()
                             .ok_or(format!(
                                 "Missing third normal component at line: {}",
                                 lineno + 1
                             ))?
-                            .parse()?,
+                            .parse()
+                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
                     ));
                 }
                 Some("f") => {
@@ -126,14 +161,22 @@ impl GenericMesh {
                             face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
-                                .parse::<usize>()?
+                                .parse::<usize>()
+                                .map_err(|e| {
+                                    format!("Invalid vertex index digit at line: {}", lineno + 1)
+                                })?
                                 - 1,
                             match face_iter.next() {
                                 Some(vt) => {
                                     if vt.is_empty() {
                                         0
                                     } else {
-                                        vt.parse::<usize>()? - 1
+                                        vt.parse::<usize>().map_err(|e| {
+                                            format!(
+                                                "Invalid texture index digit at line: {}",
+                                                lineno + 1
+                                            )
+                                        })? - 1
                                     }
                                 }
                                 None => 0,
@@ -149,14 +192,22 @@ impl GenericMesh {
                             face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
-                                .parse::<usize>()?
+                                .parse::<usize>()
+                                .map_err(|e| {
+                                    format!("Invalid vertex index digit at line: {}", lineno + 1)
+                                })?
                                 - 1,
                             match face_iter.next() {
                                 Some(vt) => {
                                     if vt.is_empty() {
                                         0
                                     } else {
-                                        vt.parse::<usize>()? - 1
+                                        vt.parse::<usize>().map_err(|e| {
+                                            format!(
+                                                "Invalid texture index digit at line: {}",
+                                                lineno + 1
+                                            )
+                                        })? - 1
                                     }
                                 }
                                 None => 0,
@@ -164,7 +215,14 @@ impl GenericMesh {
                         ));
                     }
 
-                    let material = mtl_map.get(cur_mtl).ok_or(format!("Couldn't find material at line: {} in file: {}", lineno + 1, file_name))?.clone();
+                    let material = mtl_map
+                        .get(cur_mtl)
+                        .ok_or(format!(
+                            "Couldn't find material at line: {} in file: {}",
+                            lineno + 1,
+                            file_name
+                        ))?
+                        .clone();
 
                     for tri in clip_ears(&mut poly_verts, material) {
                         tris.push(tri);
@@ -208,7 +266,7 @@ impl GenericMesh {
         for vertex in &mut vertices {
             vertex.normal = vertex.normal.normalize();
         }
-
+        pb.finish();
         Ok(Self {
             verts: vertices,
             tris,
@@ -254,7 +312,8 @@ impl GenericMesh {
                             lineno + 1,
                             file_name
                         ))?
-                        .parse::<f32>()?;
+                        .parse::<f32>()
+                        .map_err(|e| format!("Invalid float at line: {}", lineno + 1))?;
                 }
                 Some("Tf") => {
                     // Not supported TODO later
@@ -334,7 +393,8 @@ fn color_from_line(
                 lineno + 1,
                 file_name
             ))?
-            .parse::<f32>()?,
+            .parse::<f32>()
+            .map_err(|e| format!("Invalid f32 for red at line: {}", lineno + 1))?,
         g: components
             .next()
             .ok_or(format!(
@@ -342,7 +402,8 @@ fn color_from_line(
                 lineno + 1,
                 file_name
             ))?
-            .parse::<f32>()?,
+            .parse::<f32>()
+            .map_err(|e| format!("Invalid f32 for green at line: {}", lineno + 1))?,
         b: components
             .next()
             .ok_or(format!(
@@ -350,7 +411,8 @@ fn color_from_line(
                 lineno + 1,
                 file_name
             ))?
-            .parse::<f32>()?,
+            .parse::<f32>()
+            .map_err(|e| format!("Invalid f32 for blue at line: {}", lineno + 1))?,
         a: 1.0,
     })
 }

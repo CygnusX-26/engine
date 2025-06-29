@@ -151,7 +151,7 @@ impl World {
                 let s1 = screen_verts[vert1_index];
                 let s2 = screen_verts[vert2_index];
                 let s3 = screen_verts[vert3_index];
-                if !s1.x.is_finite() || !s2.x.is_finite() || !s3.x.is_finite() {
+                if !s1.x.is_finite() || !s2.y.is_finite() {
                     continue;
                 }
 

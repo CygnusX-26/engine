@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 env_logger = "0.11.8"
 image = "0.25.6"
+indicatif = "0.17.11"
 log = "0.4.27"
 nalgebra = "0.33.2"
 ordered-float = "5.0.0"
