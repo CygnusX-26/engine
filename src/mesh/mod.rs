@@ -14,6 +14,7 @@ pub trait Mesh: Sync {
     fn verts(&self) -> &[Vertex];
     fn tris(&self) -> &[Triangle];
     fn texturecoords(&self) -> &[TextureCoord];
+    fn normals(&self) -> &[Normal];
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -23,16 +24,14 @@ pub struct TextureCoord {
     pub w: f32,
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct Vertex {
-    pub position: Point3<f32>,
-    pub normal: Vector3<f32>,
-}
+pub type Vertex = Point3<f32>;
+pub type Normal = Vector3<f32>;
 
 #[derive(Debug, Clone)]
 pub struct Triangle {
     pub verts: [usize; 3], // vertex indicies
     pub texes: [usize; 3], // texture indicies
+    pub norms: [usize; 3],
     pub mtl: Arc<Material>,
 }
 

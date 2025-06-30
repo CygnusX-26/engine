@@ -18,4 +18,3 @@ winit_input_helper = "0.16.0"
 [profile.release]
 opt-level = 3
 codegen-units = 1
-target-cpu = "native"

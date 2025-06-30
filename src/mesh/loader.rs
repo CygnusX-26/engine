@@ -3,7 +3,7 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::info;
 use nalgebra::{Point2, Point3, Vector3};
 
-use crate::mesh::{Color, Material, Mesh, TextureCoord, Triangle, Vertex, SKYBLUE};
+use crate::mesh::{Color, Material, Mesh, Normal, TextureCoord, Triangle, Vertex, SKYBLUE};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Write;
@@ -18,6 +18,7 @@ pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
     texture_coords: Vec<TextureCoord>,
+    normals: Vec<Normal>
 }
 
 impl GenericMesh {
@@ -130,7 +131,7 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
+                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
                         components
                             .next()
                             .ok_or(format!(
@@ -138,7 +139,7 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
+                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
                         components
                             .next()
                             .ok_or(format!(
@@ -146,11 +147,11 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit at line: {}", lineno + 1))?,
+                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
                     ));
                 }
                 Some("f") => {
-                    let mut poly_verts: Vec<(usize, usize)> = vec![];
+                    let mut poly_verts: Vec<(usize, usize, usize)> = vec![];
 
                     for _ in 0..2 {
                         let mut face_iter = components
@@ -177,6 +178,21 @@ impl GenericMesh {
                                                 lineno + 1
                                             )
                                         })? - 1
+                                    }
+                                }
+                                None => 0,
+                            },
+                            match face_iter.next() {
+                                Some(vn) => {
+                                    if vn.is_empty() {
+                                        0
+                                    } else {
+                                        vn.parse::<usize>().map_err(|e| {
+                                            format!(
+                                                "Invalid normal index digit at line: {}",
+                                                lineno + 1
+                                            )
+                                        })?
                                     }
                                 }
                                 None => 0,
@@ -212,6 +228,21 @@ impl GenericMesh {
                                 }
                                 None => 0,
                             },
+                            match face_iter.next() {
+                                Some(vn) => {
+                                    if vn.is_empty() {
+                                        0
+                                    } else {
+                                        vn.parse::<usize>().map_err(|e| {
+                                            format!(
+                                                "Invalid normal index digit at line: {}",
+                                                lineno + 1
+                                            )
+                                        })?
+                                    }
+                                }
+                                None => 0,
+                            },
                         ));
                     }
 
@@ -232,46 +263,32 @@ impl GenericMesh {
             }
         }
 
-        let max_len = verts.len().max(normals.len()).max(texture_coords.len());
+        // IF they did not specify normals, we average over faces.
+        if normals.len() == 0 {
+            normals.resize(verts.len(), Vector3::zeros());
+            for triangle in &tris {
+                let i0 = triangle.verts[0];
+                let i1 = triangle.verts[1];
+                let i2 = triangle.verts[2];
+                let v0 = verts[i0];
+                let v1 = verts[i1];
+                let v2 = verts[i2];
+                let edge1 = v1 - v0;
+                let edge2 = v2 - v0;
+                let face_normal = edge1.cross(&edge2).normalize();
 
-        verts.resize(max_len, Point3::origin());
-        
-        normals.resize(max_len, Vector3::zeros());
-
-        let mut vertices: Vec<Vertex> = verts
-            .into_iter()
-            .zip(normals)
-            .map(|(v, n)| -> Vertex {
-                Vertex {
-                    position: v,
-                    normal: n,
-                }
-            })
-            .collect();
-
-        for triangle in &tris {
-            let i0 = triangle.verts[0];
-            let i1 = triangle.verts[1];
-            let i2 = triangle.verts[2];
-            let v0 = vertices[i0].position;
-            let v1 = vertices[i1].position;
-            let v2 = vertices[i2].position;
-            let edge1 = v1 - v0;
-            let edge2 = v2 - v0;
-            let face_normal = edge1.cross(&edge2).normalize();
-
-            vertices[i0].normal += face_normal;
-            vertices[i1].normal += face_normal;
-            vertices[i2].normal += face_normal;
+                normals[i0] += face_normal;
+                normals[i1] += face_normal;
+                normals[i2] += face_normal;
+            }
         }
-        for vertex in &mut vertices {
-            vertex.normal = vertex.normal.normalize();
-        }
+        normals = normals.iter().map(|norm| norm.normalize()).collect();
         pb.finish();
         Ok(Self {
-            verts: vertices,
+            verts,
             tris,
             texture_coords,
+            normals
         })
     }
 
@@ -360,6 +377,10 @@ impl Mesh for GenericMesh {
     fn texturecoords(&self) -> &[TextureCoord] {
         &self.texture_coords
     }
+
+    fn normals(&self) -> &[Normal] {
+        &self.normals
+    }
 }
 
 fn open_image_from_line(
@@ -418,13 +439,14 @@ fn color_from_line(
     })
 }
 
-fn clip_ears<'a>(poly_verts: &mut Vec<(usize, usize)>, cur_mtl: Arc<Material>) -> Vec<Triangle> {
+fn clip_ears(poly_verts: &mut Vec<(usize, usize, usize)>, cur_mtl: Arc<Material>) -> Vec<Triangle> {
     let mut tris: Vec<Triangle> = vec![];
     while poly_verts.len() > 2 {
         tris.push(Triangle {
             verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order TODO later
             mtl: cur_mtl.clone(),
             texes: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
+            norms: [poly_verts[1].2, poly_verts[0].2, poly_verts[2].2]
         });
         poly_verts.remove(1);
     }
