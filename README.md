@@ -1,6 +1,6 @@
 # Engine
 
-A super basic graphics engine written completely from scratch that can render `.obj` and `.mtl` files. I've been working on this as both my first rust project and a way to kill time at work.
+A super basic graphics engine written completely from scratch that can render `.obj` and `.mtl` files WITH texture mapping. I've been working on this as both my first rust project and a way to kill time at work.
 
 ![example](imgs/sky.gif)
 
