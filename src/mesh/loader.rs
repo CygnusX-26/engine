@@ -235,6 +235,7 @@ impl GenericMesh {
         let max_len = verts.len().max(normals.len()).max(texture_coords.len());
 
         verts.resize(max_len, Point3::origin());
+        
         normals.resize(max_len, Vector3::zeros());
 
         let mut vertices: Vec<Vertex> = verts

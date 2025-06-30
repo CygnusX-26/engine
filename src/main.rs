@@ -151,7 +151,7 @@ impl World {
                 let s1 = screen_verts[vert1_index];
                 let s2 = screen_verts[vert2_index];
                 let s3 = screen_verts[vert3_index];
-                if !s1.x.is_finite() || !s2.y.is_finite() {
+                if !should_be_rendered(s1, s2, s3) {
                     continue;
                 }
 
@@ -416,6 +416,11 @@ fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32>
     incident - (normal * (incident.dot(normal))).scale(2.0)
 }
 
+// TODO fix triangles diappearing
+fn should_be_rendered(s1: Point2<f32>, s2: Point2<f32>, s3: Point2<f32>) -> bool {
+    return !(s1.x.is_nan() && s1.y.is_nan() && s2.x.is_nan() && s2.y.is_nan() && s3.x.is_nan() && s3.y.is_nan());
+}
+
 fn main() -> Result<(), Error> {
     env_logger::init();
     let Some(filename) = std::env::args().nth(1) else {
@@ -453,8 +458,8 @@ fn main() -> Result<(), Error> {
 
     let mut world = World::new(
         Camera {
-            position: Point3::new(0.0, 0.0, -10.0),
-            target: Point3::new(0.0, 0.0, 0.0),
+            position: Point3::new(0.0, 0.0, -3000.0),
+            target: Point3::new(0.0, 0.0, -2900.0),
             up: Vector3::new(0.0, 1.0, 0.0),
             pitch: 0.0,
             yaw: 0.0,
@@ -465,7 +470,7 @@ fn main() -> Result<(), Error> {
             intensity: 1.0,
             ambient: 0.9,
         },
-        Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 200.0).to_homogeneous(),
+        Perspective3::new((WIDTH as f32) / (HEIGHT as f32), 1.0, 0.3, 2000.0).to_homogeneous(),
         vec![Object {
             mesh: Box::new(mesh),
             offset_x: 0.0,
@@ -517,7 +522,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 0.2);
+            handle_keys(&input, &mut world.camera, 10.0);
             window.request_redraw();
         }
     });

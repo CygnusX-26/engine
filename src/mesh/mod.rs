@@ -60,9 +60,9 @@ pub struct Material {
 impl Default for Material {
     fn default() -> Self {
         Self {
-            ka: SKYBLUE,
-            kd: SKYBLUE,
-            ks: SKYBLUE,
+            ka: DIM,
+            kd: DIM,
+            ks: DIM,
             transparency: 0.0,
             tf: BLACK,
             ni: 0.0,
@@ -182,4 +182,11 @@ pub const BLACK: Color = Color {
     g: 0.0,
     b: 0.0,
     a: 1.0,
+};
+
+pub const DIM: Color = Color {
+    r: 0.1,
+    g: 0.1,
+    b: 0.1,
+    a: 1.0
 };
