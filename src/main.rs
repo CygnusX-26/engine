@@ -7,12 +7,12 @@ use mesh::Material;
 use mesh::Mesh;
 use mesh::loader::GenericMesh;
 
+use clap::Parser;
 use log::{error, info};
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3};
+use pixels::{Error, Pixels, SurfaceTexture};
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
-
-use pixels::{Error, Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::EventLoop;
@@ -32,6 +32,16 @@ pub struct Object {
     offset_x: f32,
     offset_y: f32,
     offset_z: f32,
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    filename: String,
+
+    #[arg(short, long, help = "flip all normals")]
+    normals: bool,
 }
 
 pub struct Camera {
@@ -72,7 +82,7 @@ impl World {
         }
     }
 
-    pub fn draw(&mut self, view_mat: Matrix4<f32>, frame: &mut [u8]) {
+    pub fn draw(&mut self, view_mat: Matrix4<f32>, frame: &mut [u8], flip_normals: bool) {
         frame.fill(255);
         let model_with_mats: Vec<(&Object, Matrix4<f32>)> = self
             .models
@@ -160,9 +170,9 @@ impl World {
                 let n1_idx = tri.norms[0];
                 let n2_idx = tri.norms[1];
                 let n3_idx = tri.norms[2];
-                let n1;
-                let n2;
-                let n3;
+                let mut n1;
+                let mut n2;
+                let mut n3;
 
                 if n1_idx > 0 && n2_idx > 0 && n3_idx > 0 {
                     n1 = transformed_norms[n1_idx - 1];
@@ -172,6 +182,12 @@ impl World {
                     n1 = transformed_norms[vert1_index];
                     n2 = transformed_norms[vert2_index];
                     n3 = transformed_norms[vert3_index];
+                }
+
+                if flip_normals {
+                    n1 = -n1;
+                    n2 = -n2;
+                    n3 = -n3;
                 }
 
                 let z1 = zvalues[vert1_index];
@@ -426,12 +442,11 @@ fn sample_texture(interp_u: f32, interp_v: f32, tex: &DynamicImage) -> Color {
     }
 }
 
+/// TODO: Add better documentation and clean up code
 fn main() -> Result<(), Error> {
     env_logger::init();
-    let Some(filename) = std::env::args().nth(1) else {
-        error!("Usage: cargo run --release <filename>");
-        std::process::exit(1);
-    };
+    let cli = Args::parse();
+    let filename = cli.filename;
     info!("Loading mesh for {filename}");
     let mesh = GenericMesh::from_file(&filename).unwrap_or_else(|e| {
         error!("{e:?}");
@@ -497,7 +512,7 @@ fn main() -> Result<(), Error> {
             ..
         } = event
         {
-            world.draw(view_mat, pixels.frame_mut());
+            world.draw(view_mat, pixels.frame_mut(), cli.normals);
             if let Err(err) = pixels.render() {
                 error!("failed: {err}");
                 elwt.exit();

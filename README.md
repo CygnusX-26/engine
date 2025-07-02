@@ -7,9 +7,19 @@ A super basic graphics engine written completely from scratch that can render `.
 ## Run
 
 ```sh
-RUST_LOG=info cargo run --release objects/skyscraper.obj
+Usage: engine [OPTIONS] --filename <FILENAME>
+
+Options:
+  -f, --filename <FILENAME>
+  -n, --normals              flip all normals
+  -h, --help                 Print help
+  -V, --version              Print version
 ```
-You can replace `objects/skyscraper.obj` with any `.obj` file. 
+
+```sh
+RUST_LOG=info cargo run --release -- --filename objects/cottage_obj.obj
+```
+You can replace `objects/cottage_obj.obj` with any `.obj` file. 
 
 
 
