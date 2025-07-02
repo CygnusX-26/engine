@@ -139,7 +139,7 @@ impl World {
 
             let transformed_norms: Vec<Normal> = model
                 .normals()
-                .into_iter()
+                .iter()
                 .map(|norm| normal_mat * norm)
                 .collect();
 
@@ -409,7 +409,7 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
 // TODO fix triangles diappearing
 #[inline(always)]
 fn should_be_rendered(s1: Point2<f32>, s2: Point2<f32>, s3: Point2<f32>) -> bool {
-    return s1.x.is_finite() && s2.x.is_finite() && s3.x.is_finite();
+    s1.x.is_finite() && s2.x.is_finite() && s3.x.is_finite()
 }
 
 #[inline(always)]

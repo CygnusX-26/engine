@@ -270,7 +270,7 @@ impl GenericMesh {
         }
 
         // IF they did not specify normals, we average over faces.
-        if normals.len() == 0 {
+        if normals.is_empty() {
             normals.resize(verts.len(), Vector3::zeros());
             for triangle in &tris {
                 let i0 = triangle.verts[0];
