@@ -3,11 +3,11 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::info;
 use nalgebra::{Point2, Point3, Vector3};
 
-use crate::mesh::{Color, Material, Mesh, Normal, TextureCoord, Triangle, Vertex, SKYBLUE};
+use crate::mesh::{Color, Material, Mesh, Normal, SKYBLUE, TextureCoord, Triangle, Vertex};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::Write;
-use std::fs::{read_to_string, File};
+use std::fs::{File, read_to_string};
 use std::hash::Hash;
 use std::io::{BufRead, BufReader};
 use std::str::SplitWhitespace;
@@ -29,11 +29,13 @@ impl GenericMesh {
         let mut texture_coords: Vec<TextureCoord> = vec![];
 
         let mut mtl_map: HashMap<String, Arc<Material>> = HashMap::new();
-        mtl_map.insert(String::from("\x04\x06__default__\x05"), Arc::new(Default::default()));
+        mtl_map.insert(
+            String::from("\x04\x06__default__\x05"),
+            Arc::new(Default::default()),
+        );
         let mut cur_mtl = "\x04\x06__default_\x05";
 
-        let file =
-            File::open(file_name).map_err(|e| format!("Couldn't open file: {}", file_name))?;
+        let file = File::open(file_name).map_err(|e| format!("Couldn't open file: {file_name}"))?;
         let reader = BufReader::new(file);
         let total_lines = reader.lines().count();
 

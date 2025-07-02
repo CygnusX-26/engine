@@ -3,9 +3,9 @@ mod mesh;
 use image::DynamicImage;
 use image::GenericImageView;
 use image::Pixel;
-use mesh::loader::GenericMesh;
 use mesh::Material;
 use mesh::Mesh;
+use mesh::loader::GenericMesh;
 
 use log::{error, info};
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3};
@@ -110,8 +110,8 @@ impl World {
             .collect();
 
         // Iterate over meshes in sorted zbuffer order
-        for (mesh, model_mat) in &model_with_mats {
-            let model = &mesh.mesh;
+        for (model, model_mat) in &model_with_mats {
+            let mesh = &model.mesh;
             let normal_mat = model_mat
                 .fixed_view::<3, 3>(0, 0)
                 .try_inverse()
@@ -119,7 +119,7 @@ impl World {
                 .transpose();
             let proj = self.proj_mat * view_mat * model_mat;
 
-            for vertex in model.verts().iter().copied() {
+            for vertex in mesh.verts().iter().copied() {
                 let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
@@ -138,69 +138,67 @@ impl World {
             }
 
             let transformed_norms: Vec<Normal> = model
+                .mesh
                 .normals()
                 .iter()
                 .map(|norm| normal_mat * norm)
                 .collect();
 
             // Draw the triangles
-            for tri in model.tris() {
+            for tri in mesh.tris() {
                 let vert1_index = tri.verts[0];
                 let vert2_index = tri.verts[1];
                 let vert3_index = tri.verts[2];
                 let s1 = screen_verts[vert1_index];
                 let s2 = screen_verts[vert2_index];
                 let s3 = screen_verts[vert3_index];
-                if !should_be_rendered(s1, s2, s3) {
+                if !should_be_rendered(s1, s2, s3) || !is_front_facing(s1, s2, s3) {
                     continue;
                 }
+                let texture_coords = mesh.texturecoords();
 
-                if is_front_facing(s1, s2, s3) {
-                    let texture_coords = mesh.mesh.texturecoords();
+                let n1_idx = tri.norms[0];
+                let n2_idx = tri.norms[1];
+                let n3_idx = tri.norms[2];
+                let n1;
+                let n2;
+                let n3;
 
-                    let n1_idx = tri.norms[0];
-                    let n2_idx = tri.norms[1];
-                    let n3_idx = tri.norms[2];
-                    let n1;
-                    let n2;
-                    let n3;
-
-                    if n1_idx > 0 && n2_idx > 0 && n3_idx > 0 {
-                        n1 = transformed_norms[n1_idx - 1];
-                        n2 = transformed_norms[n2_idx - 1];
-                        n3 = transformed_norms[n3_idx - 1];
-                    } else {
-                        n1 = transformed_norms[vert1_index];
-                        n2 = transformed_norms[vert2_index];
-                        n3 = transformed_norms[vert3_index];
-                    }
-
-                    let z1 = zvalues[vert1_index];
-                    let z2 = zvalues[vert2_index];
-                    let z3 = zvalues[vert3_index];
-
-                    let w1 = wvalues[vert1_index];
-                    let w2 = wvalues[vert2_index];
-                    let w3 = wvalues[vert3_index];
-
-                    let t1 = texture_coords.get(tri.texes[0]);
-                    let t2 = texture_coords.get(tri.texes[1]);
-                    let t3 = texture_coords.get(tri.texes[2]);
-
-                    self.draw_triangle(
-                        [s1, s2, s3],
-                        [n1, n2, n3],
-                        [z1, z2, z3],
-                        match (t1, t2, t3) {
-                            (Some(tc1), Some(tc2), Some(tc3)) => Some([*tc1, *tc2, *tc3]),
-                            _ => None,
-                        },
-                        [w1, w2, w3],
-                        &tri.mtl,
-                        frame,
-                        &mut zbuffer,
-                    );
+                if n1_idx > 0 && n2_idx > 0 && n3_idx > 0 {
+                    n1 = transformed_norms[n1_idx - 1];
+                    n2 = transformed_norms[n2_idx - 1];
+                    n3 = transformed_norms[n3_idx - 1];
+                } else {
+                    n1 = transformed_norms[vert1_index];
+                    n2 = transformed_norms[vert2_index];
+                    n3 = transformed_norms[vert3_index];
                 }
+
+                let z1 = zvalues[vert1_index];
+                let z2 = zvalues[vert2_index];
+                let z3 = zvalues[vert3_index];
+
+                let w1 = wvalues[vert1_index];
+                let w2 = wvalues[vert2_index];
+                let w3 = wvalues[vert3_index];
+
+                let t1 = texture_coords.get(tri.texes[0]);
+                let t2 = texture_coords.get(tri.texes[1]);
+                let t3 = texture_coords.get(tri.texes[2]);
+
+                self.draw_triangle(
+                    [s1, s2, s3],
+                    [n1, n2, n3],
+                    [z1, z2, z3],
+                    match (t1, t2, t3) {
+                        (Some(tc1), Some(tc2), Some(tc3)) => Some([*tc1, *tc2, *tc3]),
+                        _ => None,
+                    },
+                    [w1, w2, w3],
+                    &tri.mtl,
+                    frame,
+                    &mut zbuffer,
+                );
             }
             screen_verts.clear();
             zvalues.clear();
@@ -218,6 +216,18 @@ impl World {
         frame: &mut [u8],
         zbuffer: &mut [AtomicU32],
     ) {
+        let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
+        let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
+        let (x3, y3) = (screen_verts[2].x, screen_verts[2].y);
+        let min_x = (x1.min(x2).min(x3).max(0.0)) as usize;
+        let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as usize;
+        let min_y = (y1.min(y2).min(y3).max(0.0)) as usize;
+        let max_y = (y1.max(y2).max(y3).min(HEIGHT as f32 - 1.0) + 1.0) as usize;
+
+        if min_x > max_x || min_y > max_y {
+            return;
+        }
+
         let z1 = z_values[0];
         let z2 = z_values[1];
         let z3 = z_values[2];
@@ -229,21 +239,6 @@ impl World {
         let n3 = normals[2];
         let light_dir = (self.light.position - self.light.target).normalize();
         let ambient = self.light.ambient;
-        let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
-        let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
-        let (x3, y3) = (screen_verts[2].x, screen_verts[2].y);
-        let min_x = (x1.min(x2).min(x3).max(0.0)) as usize;
-        let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as usize;
-        let min_y = (y1.min(y2).min(y3).max(0.0)) as usize;
-        let max_y = (y1.max(y2).max(y3).min(HEIGHT as f32 - 1.0) + 1.0) as usize;
-
-        if min_x > max_x {
-            return;
-        }
-
-        if min_y > max_y {
-            return;
-        }
 
         let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
             (py - ay) * (bx - ax) - (px - ax) * (by - ay)
@@ -259,95 +254,100 @@ impl World {
             .for_each(|(row_idx, row)| {
                 let y = row_idx + min_y;
                 for x in min_x..=max_x {
-                    let z_index = y * WIDTH + x;
-                    if z_index >= WIDTH * HEIGHT {
-                        continue;
-                    }
                     let p = (x as f32, y as f32);
                     let mut w1 = edge((x2, y2), (x3, y3), p);
                     let mut w2 = edge((x3, y3), (x1, y1), p);
                     let mut w3 = edge((x1, y1), (x2, y2), p);
-                    if w1 >= 0.0 && w2 >= 0.0 && w3 >= 0.0 {
-                        let area = w1 + w2 + w3;
+                    if w1 < 0.0 || w2 < 0.0 || w3 < 0.0 {
+                        continue;
+                    }
 
-                        w1 /= area;
-                        w2 /= area;
-                        w3 /= area;
+                    let idx = x * 4;
+                    if idx + 4 > row.len() {
+                        continue;
+                    }
 
-                        let current_z = &zbuffer[z_index];
-                        let current_z_bits = current_z.load(Ordering::Relaxed);
-                        let interpolated_z = w1 * z1 + w2 * z2 + w3 * z3;
-                        if interpolated_z < f32::from_bits(current_z_bits)
-                            && current_z
-                                .compare_exchange(
-                                    current_z_bits,
-                                    f32::to_bits(interpolated_z),
-                                    Ordering::Relaxed,
-                                    Ordering::Relaxed,
-                                )
-                                .is_ok()
-                        {
-                            let mut ka = mtl.ka;
-                            let mut kd = mtl.kd;
-                            let mut ks = mtl.ks;
+                    let z_index = y * WIDTH + x;
+                    if z_index >= WIDTH * HEIGHT {
+                        continue;
+                    }
 
-                            let one_over_z = w1 * perspective_warp_1
-                                + w2 * perspective_warp_2
-                                + w3 * perspective_warp_3;
+                    let area = w1 + w2 + w3;
 
-                            if let Some([uv1, uv2, uv3]) = texture_coords {
-                                let u_over_z = w1 * uv1.u * perspective_warp_1
-                                    + w2 * uv2.u * perspective_warp_2
-                                    + w3 * uv3.u * perspective_warp_3;
-                                let v_over_z = w1 * uv1.v * perspective_warp_1
-                                    + w2 * uv2.v * perspective_warp_2
-                                    + w3 * uv3.v * perspective_warp_3;
+                    w1 /= area;
+                    w2 /= area;
+                    w3 /= area;
 
-                                let interpolated_u = (u_over_z / one_over_z).clamp(0.0, 1.0);
-                                let interpolated_v = 1.0 - (v_over_z / one_over_z).clamp(0.0, 1.0);
-
-                                if let Some(ref tex) = mtl.map_ka {
-                                    ka = sample_texture(interpolated_u, interpolated_v, tex);
-                                }
-                                if let Some(ref tex) = mtl.map_kd {
-                                    kd = sample_texture(interpolated_u, interpolated_v, tex);
-                                }
-                                if let Some(ref tex) = mtl.map_ks {
-                                    ks = sample_texture(interpolated_u, interpolated_v, tex);
-                                }
-                            }
-                            let nx_over_z = w1 * n1.x * perspective_warp_1
-                                + w2 * n2.x * perspective_warp_2
-                                + w3 * n3.x * perspective_warp_3;
-                            let ny_over_z = w1 * n1.y * perspective_warp_1
-                                + w2 * n2.y * perspective_warp_2
-                                + w3 * n3.y * perspective_warp_3;
-                            let nz_over_z = w1 * n1.z * perspective_warp_1
-                                + w2 * n2.z * perspective_warp_2
-                                + w3 * n3.z * perspective_warp_3;
-
-                            let interpolated_normal = Vector3::new(
-                                nx_over_z / one_over_z,
-                                ny_over_z / one_over_z,
-                                nz_over_z / one_over_z,
+                    let current_z = &zbuffer[z_index];
+                    let current_z_bits = current_z.load(Ordering::Relaxed);
+                    let interpolated_z = w1 * z1 + w2 * z2 + w3 * z3;
+                    if interpolated_z > f32::from_bits(current_z_bits)
+                        || current_z
+                            .compare_exchange(
+                                current_z_bits,
+                                f32::to_bits(interpolated_z),
+                                Ordering::Relaxed,
+                                Ordering::Relaxed,
                             )
-                            .normalize();
+                            .is_err()
+                    {
+                        continue;
+                    }
 
-                            let diffuse = light_dir.dot(&interpolated_normal).clamp(0.1, 1.0);
-                            let specular = 0.0; //no fancy lighting for now its too laggy
-                            let color = ka * ambient + kd * diffuse + ks * specular;
+                    let mut ka = mtl.ka;
+                    let mut kd = mtl.kd;
+                    let mut ks = mtl.ks;
 
-                            let idx = x * 4;
-                            if idx + 4 <= row.len() {
-                                row[idx..idx + 4].copy_from_slice(&[
-                                    (color.r * 255.0) as u8,
-                                    (color.g * 255.0) as u8,
-                                    (color.b * 255.0) as u8,
-                                    (color.a * 255.0) as u8,
-                                ]);
-                            }
+                    let one_over_z =
+                        w1 * perspective_warp_1 + w2 * perspective_warp_2 + w3 * perspective_warp_3;
+
+                    if let Some([uv1, uv2, uv3]) = texture_coords {
+                        let u_over_z = w1 * uv1.u * perspective_warp_1
+                            + w2 * uv2.u * perspective_warp_2
+                            + w3 * uv3.u * perspective_warp_3;
+                        let v_over_z = w1 * uv1.v * perspective_warp_1
+                            + w2 * uv2.v * perspective_warp_2
+                            + w3 * uv3.v * perspective_warp_3;
+
+                        let interpolated_u = (u_over_z / one_over_z).clamp(0.0, 1.0);
+                        let interpolated_v = 1.0 - (v_over_z / one_over_z).clamp(0.0, 1.0);
+
+                        if let Some(ref tex) = mtl.map_ka {
+                            ka = sample_texture(interpolated_u, interpolated_v, tex);
+                        }
+                        if let Some(ref tex) = mtl.map_kd {
+                            kd = sample_texture(interpolated_u, interpolated_v, tex);
+                        }
+                        if let Some(ref tex) = mtl.map_ks {
+                            ks = sample_texture(interpolated_u, interpolated_v, tex);
                         }
                     }
+                    let nx_over_z = w1 * n1.x * perspective_warp_1
+                        + w2 * n2.x * perspective_warp_2
+                        + w3 * n3.x * perspective_warp_3;
+                    let ny_over_z = w1 * n1.y * perspective_warp_1
+                        + w2 * n2.y * perspective_warp_2
+                        + w3 * n3.y * perspective_warp_3;
+                    let nz_over_z = w1 * n1.z * perspective_warp_1
+                        + w2 * n2.z * perspective_warp_2
+                        + w3 * n3.z * perspective_warp_3;
+
+                    let interpolated_normal = Vector3::new(
+                        nx_over_z / one_over_z,
+                        ny_over_z / one_over_z,
+                        nz_over_z / one_over_z,
+                    )
+                    .normalize();
+
+                    let diffuse = light_dir.dot(&interpolated_normal).clamp(0.1, 1.0);
+                    let specular = 0.0; //no fancy lighting for now its too laggy
+                    let color = ka * ambient + kd * diffuse + ks * specular;
+                    row[idx..idx + 4].copy_from_slice(&[
+                        (color.r * 255.0) as u8,
+                        (color.g * 255.0) as u8,
+                        (color.b * 255.0) as u8,
+                        (color.a * 255.0) as u8,
+                    ]);
                 }
             });
     }
@@ -356,8 +356,7 @@ impl World {
 /// True if the triangle faces the cam. False, we dont need to draw it.
 #[inline(always)]
 fn is_front_facing(p1: Point2<f32>, p2: Point2<f32>, p3: Point2<f32>) -> bool {
-    let cross = (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
-    cross > 0.0
+    (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x) > 0.0
 }
 
 #[inline(always)]
@@ -433,12 +432,12 @@ fn main() -> Result<(), Error> {
         error!("Usage: cargo run --release <filename>");
         std::process::exit(1);
     };
-    info!("Loading mesh for {}", filename);
+    info!("Loading mesh for {filename}");
     let mesh = GenericMesh::from_file(&filename).unwrap_or_else(|e| {
-        error!("{:?}", e);
+        error!("{e:?}");
         std::process::exit(1);
     });
-    info!("Done loading mesh for {}", filename);
+    info!("Done loading mesh for {filename}");
     let mut input = WinitInputHelper::new();
     let event_loop = EventLoop::new().unwrap();
     let window = {
