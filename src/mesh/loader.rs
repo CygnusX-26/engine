@@ -18,7 +18,7 @@ pub struct GenericMesh {
     verts: Vec<Vertex>,
     tris: Vec<Triangle>,
     texture_coords: Vec<TextureCoord>,
-    normals: Vec<Normal>
+    normals: Vec<Normal>,
 }
 
 impl GenericMesh {
@@ -131,7 +131,9 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
+                            .map_err(|e| {
+                                format!("Invalid digit for normal at line: {}", lineno + 1)
+                            })?,
                         components
                             .next()
                             .ok_or(format!(
@@ -139,7 +141,9 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
+                            .map_err(|e| {
+                                format!("Invalid digit for normal at line: {}", lineno + 1)
+                            })?,
                         components
                             .next()
                             .ok_or(format!(
@@ -147,7 +151,9 @@ impl GenericMesh {
                                 lineno + 1
                             ))?
                             .parse()
-                            .map_err(|e| format!("Invalid digit for normal at line: {}", lineno + 1))?,
+                            .map_err(|e| {
+                                format!("Invalid digit for normal at line: {}", lineno + 1)
+                            })?,
                     ));
                 }
                 Some("f") => {
@@ -288,7 +294,7 @@ impl GenericMesh {
             verts,
             tris,
             texture_coords,
-            normals
+            normals,
         })
     }
 
@@ -446,7 +452,7 @@ fn clip_ears(poly_verts: &mut Vec<(usize, usize, usize)>, cur_mtl: Arc<Material>
             verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order TODO later
             mtl: cur_mtl.clone(),
             texes: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
-            norms: [poly_verts[1].2, poly_verts[0].2, poly_verts[2].2]
+            norms: [poly_verts[1].2, poly_verts[0].2, poly_verts[2].2],
         });
         poly_verts.remove(1);
     }

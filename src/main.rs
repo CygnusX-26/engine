@@ -1,5 +1,6 @@
 mod mesh;
 
+use image::DynamicImage;
 use image::GenericImageView;
 use image::Pixel;
 use mesh::loader::GenericMesh;
@@ -8,7 +9,6 @@ use mesh::Mesh;
 
 use log::{error, info};
 use nalgebra::{Matrix4, Perspective3, Point2, Point3, Point4, Vector3};
-use ordered_float::OrderedFloat;
 use rayon::prelude::*;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -120,8 +120,7 @@ impl World {
             let proj = self.proj_mat * view_mat * model_mat;
 
             for vertex in model.verts().iter().copied() {
-                let persproj = proj
-                    * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
+                let persproj = proj * Point4::new(vertex.x, vertex.y, vertex.z, 1.0);
                 let ndc_x = persproj.x / persproj.w;
                 let ndc_y = persproj.y / persproj.w;
                 let ndc_z = persproj.z / persproj.w;
@@ -138,7 +137,11 @@ impl World {
                 zvalues.push(ndc_z);
             }
 
-            let transformed_norms: Vec<Normal> = model.normals().into_iter().map(|norm| normal_mat * norm).collect();
+            let transformed_norms: Vec<Normal> = model
+                .normals()
+                .into_iter()
+                .map(|norm| normal_mat * norm)
+                .collect();
 
             // Draw the triangles
             for tri in model.tris() {
@@ -224,7 +227,7 @@ impl World {
         let n1 = normals[0];
         let n2 = normals[1];
         let n3 = normals[2];
-        let light_dir = (self.light.target - self.light.position).normalize();
+        let light_dir = (self.light.position - self.light.target).normalize();
         let ambient = self.light.ambient;
         let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
         let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
@@ -288,6 +291,10 @@ impl World {
                             let mut kd = mtl.kd;
                             let mut ks = mtl.ks;
 
+                            let one_over_z = w1 * perspective_warp_1
+                                + w2 * perspective_warp_2
+                                + w3 * perspective_warp_3;
+
                             if let Some([uv1, uv2, uv3]) = texture_coords {
                                 let u_over_z = w1 * uv1.u * perspective_warp_1
                                     + w2 * uv2.u * perspective_warp_2
@@ -295,57 +302,38 @@ impl World {
                                 let v_over_z = w1 * uv1.v * perspective_warp_1
                                     + w2 * uv2.v * perspective_warp_2
                                     + w3 * uv3.v * perspective_warp_3;
-                                let one_over_z = w1 * perspective_warp_1
-                                    + w2 * perspective_warp_2
-                                    + w3 * perspective_warp_3;
 
                                 let interpolated_u = (u_over_z / one_over_z).clamp(0.0, 1.0);
                                 let interpolated_v = 1.0 - (v_over_z / one_over_z).clamp(0.0, 1.0);
 
-                                // TODO refactor this code to be more efficient... (it works for now i sleep...)
                                 if let Some(ref tex) = mtl.map_ka {
-                                    let u =
-                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
-                                    let v =
-                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
-                                    let pixel = tex.get_pixel(u, v).to_rgb();
-                                    ka = Color {
-                                        r: pixel[0] as f32 / 255.0,
-                                        g: pixel[1] as f32 / 255.0,
-                                        b: pixel[2] as f32 / 255.0,
-                                        a: 1.0,
-                                    }
+                                    ka = sample_texture(interpolated_u, interpolated_v, tex);
                                 }
                                 if let Some(ref tex) = mtl.map_kd {
-                                    let u =
-                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
-                                    let v =
-                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
-                                    let pixel = tex.get_pixel(u, v).to_rgb();
-                                    kd = Color {
-                                        r: pixel[0] as f32 / 255.0,
-                                        g: pixel[1] as f32 / 255.0,
-                                        b: pixel[2] as f32 / 255.0,
-                                        a: 1.0,
-                                    };
-
+                                    kd = sample_texture(interpolated_u, interpolated_v, tex);
                                 }
                                 if let Some(ref tex) = mtl.map_ks {
-                                    let u =
-                                        (interpolated_u * (tex.width() - 1) as f32).round() as u32;
-                                    let v =
-                                        (interpolated_v * (tex.height() - 1) as f32).round() as u32;
-                                    let pixel = tex.get_pixel(u, v).to_rgb();
-                                    ks = Color {
-                                        r: pixel[0] as f32 / 255.0,
-                                        g: pixel[1] as f32 / 255.0,
-                                        b: pixel[2] as f32 / 255.0,
-                                        a: 1.0,
-                                    }
+                                    ks = sample_texture(interpolated_u, interpolated_v, tex);
                                 }
                             }
-                            let interpolated_normal = w1 * n1 + w2 * n2 + w3 * n3;
-                            let diffuse = light_dir.dot(&-interpolated_normal).clamp(0.0, 1.0);
+                            let nx_over_z = w1 * n1.x * perspective_warp_1
+                                + w2 * n2.x * perspective_warp_2
+                                + w3 * n3.x * perspective_warp_3;
+                            let ny_over_z = w1 * n1.y * perspective_warp_1
+                                + w2 * n2.y * perspective_warp_2
+                                + w3 * n3.y * perspective_warp_3;
+                            let nz_over_z = w1 * n1.z * perspective_warp_1
+                                + w2 * n2.z * perspective_warp_2
+                                + w3 * n3.z * perspective_warp_3;
+
+                            let interpolated_normal = Vector3::new(
+                                nx_over_z / one_over_z,
+                                ny_over_z / one_over_z,
+                                nz_over_z / one_over_z,
+                            )
+                            .normalize();
+
+                            let diffuse = light_dir.dot(&interpolated_normal).clamp(0.1, 1.0);
                             let specular = 0.0; //no fancy lighting for now its too laggy
                             let color = ka * ambient + kd * diffuse + ks * specular;
 
@@ -366,11 +354,13 @@ impl World {
 }
 
 /// True if the triangle faces the cam. False, we dont need to draw it.
+#[inline(always)]
 fn is_front_facing(p1: Point2<f32>, p2: Point2<f32>, p3: Point2<f32>) -> bool {
     let cross = (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
     cross > 0.0
 }
 
+#[inline(always)]
 fn camera_shift(camera: &mut Camera, delta: Vector3<f32>) {
     camera.position.x += delta.x;
     camera.position.z += delta.z;
@@ -416,20 +406,25 @@ fn handle_keys(input: &WinitInputHelper, camera: &mut Camera, move_speed: f32) -
     camera.generate_view_mat()
 }
 
-fn _object_depth(camera: &Camera, model_mat: &Matrix4<f32>) -> OrderedFloat<f32> {
-    let view_mat = camera.generate_view_mat();
-    let view_model = view_mat * model_mat;
-    let object_pos = view_model.transform_point(&Point3::origin());
-    OrderedFloat(object_pos.z)
-}
-
-fn _reflected_ray(incident: Vector3<f32>, normal: &Vector3<f32>) -> Vector3<f32> {
-    incident - (normal * (incident.dot(normal))).scale(2.0)
-}
-
 // TODO fix triangles diappearing
+#[inline(always)]
 fn should_be_rendered(s1: Point2<f32>, s2: Point2<f32>, s3: Point2<f32>) -> bool {
     return s1.x.is_finite() && s2.x.is_finite() && s3.x.is_finite();
+}
+
+#[inline(always)]
+fn sample_texture(interp_u: f32, interp_v: f32, tex: &DynamicImage) -> Color {
+    let u = (interp_u * (tex.width() - 1) as f32).round() as u32;
+    let v = (interp_v * (tex.height() - 1) as f32).round() as u32;
+    let pixel = tex
+        .get_pixel(u.min(tex.width() - 1), v.min(tex.height() - 1))
+        .to_rgb();
+    Color {
+        r: pixel[0] as f32 / 255.0,
+        g: pixel[1] as f32 / 255.0,
+        b: pixel[2] as f32 / 255.0,
+        a: 1.0,
+    }
 }
 
 fn main() -> Result<(), Error> {
@@ -469,8 +464,8 @@ fn main() -> Result<(), Error> {
 
     let mut world = World::new(
         Camera {
-            position: Point3::new(0.0, 0.0, -60.0),
-            target: Point3::new(0.0, 0.0, -59.0),
+            position: Point3::new(0.0, 0.0, -10.0),
+            target: Point3::new(0.0, 0.0, -9.0),
             up: Vector3::new(0.0, 1.0, 0.0),
             pitch: 0.0,
             yaw: 0.0,
@@ -479,9 +474,15 @@ fn main() -> Result<(), Error> {
             position: Point3::new(0.0, 1.0, 5.0),
             target: Point3::new(0.0, 0.0, 0.0),
             intensity: 1.0,
-            ambient: 0.5,
+            ambient: 0.1,
         },
-        Perspective3::new((WIDTH as f32) / (HEIGHT as f32), (2.0 * std::f32::consts::PI) / 5.0, 0.1, 2000.0).to_homogeneous(),
+        Perspective3::new(
+            (WIDTH as f32) / (HEIGHT as f32),
+            (2.0 * std::f32::consts::PI) / 5.0,
+            0.1,
+            2000.0,
+        )
+        .to_homogeneous(),
         vec![Object {
             mesh: Box::new(mesh),
             offset_x: 0.0,
@@ -533,7 +534,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 5.0);
+            handle_keys(&input, &mut world.camera, 0.5);
             window.request_redraw();
         }
     });

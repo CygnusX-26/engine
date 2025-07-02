@@ -187,5 +187,5 @@ pub const DIM: Color = Color {
     r: 0.1,
     g: 0.1,
     b: 0.1,
-    a: 1.0
+    a: 1.0,
 };
