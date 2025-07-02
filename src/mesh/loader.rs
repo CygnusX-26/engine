@@ -29,8 +29,8 @@ impl GenericMesh {
         let mut texture_coords: Vec<TextureCoord> = vec![];
 
         let mut mtl_map: HashMap<String, Arc<Material>> = HashMap::new();
-        mtl_map.insert(String::from("__default__"), Arc::new(Default::default()));
-        let mut cur_mtl = "__default__";
+        mtl_map.insert(String::from("\x04\x06__default__\x05"), Arc::new(Default::default()));
+        let mut cur_mtl = "\x04\x06__default_\x05";
 
         let file =
             File::open(file_name).map_err(|e| format!("Couldn't open file: {}", file_name))?;
