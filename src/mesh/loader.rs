@@ -159,7 +159,7 @@ impl GenericMesh {
                     ));
                 }
                 Some("f") => {
-                    let mut poly_verts: Vec<(usize, usize, usize)> = vec![];
+                    let mut poly_verts: Vec<(i32, i32, i32)> = vec![];
 
                     for _ in 0..2 {
                         let mut face_iter = components
@@ -170,7 +170,7 @@ impl GenericMesh {
                             face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
-                                .parse::<usize>()
+                                .parse::<i32>()
                                 .map_err(|e| {
                                     format!("Invalid vertex index digit at line: {}", lineno + 1)
                                 })?
@@ -180,7 +180,7 @@ impl GenericMesh {
                                     if vt.is_empty() {
                                         0
                                     } else {
-                                        vt.parse::<usize>().map_err(|e| {
+                                        vt.parse::<i32>().map_err(|e| {
                                             format!(
                                                 "Invalid texture index digit at line: {}",
                                                 lineno + 1
@@ -195,7 +195,7 @@ impl GenericMesh {
                                     if vn.is_empty() {
                                         0
                                     } else {
-                                        vn.parse::<usize>().map_err(|e| {
+                                        vn.parse::<i32>().map_err(|e| {
                                             format!(
                                                 "Invalid normal index digit at line: {}",
                                                 lineno + 1
@@ -216,7 +216,7 @@ impl GenericMesh {
                             face_iter
                                 .next()
                                 .ok_or(format!("Missing vertex value at line: {}", lineno + 1))?
-                                .parse::<usize>()
+                                .parse::<i32>()
                                 .map_err(|e| {
                                     format!("Invalid vertex index digit at line: {}", lineno + 1)
                                 })?
@@ -226,7 +226,7 @@ impl GenericMesh {
                                     if vt.is_empty() {
                                         0
                                     } else {
-                                        vt.parse::<usize>().map_err(|e| {
+                                        vt.parse::<i32>().map_err(|e| {
                                             format!(
                                                 "Invalid texture index digit at line: {}",
                                                 lineno + 1
@@ -241,7 +241,7 @@ impl GenericMesh {
                                     if vn.is_empty() {
                                         0
                                     } else {
-                                        vn.parse::<usize>().map_err(|e| {
+                                        vn.parse::<i32>().map_err(|e| {
                                             format!(
                                                 "Invalid normal index digit at line: {}",
                                                 lineno + 1
@@ -447,14 +447,34 @@ fn color_from_line(
     })
 }
 
-fn clip_ears(poly_verts: &mut Vec<(usize, usize, usize)>, cur_mtl: Arc<Material>) -> Vec<Triangle> {
+fn clip_ears(poly_verts: &mut Vec<(i32, i32, i32)>, cur_mtl: Arc<Material>) -> Vec<Triangle> {
     let mut tris: Vec<Triangle> = vec![];
+    let mut first = 1;
+    let mut second = 0;
+    let third = 2;
+    let to_index = |val: i32| val.unsigned_abs() as usize;
     while poly_verts.len() > 2 {
+        if poly_verts[0].0 < 0 {
+            first = 0;
+            second = 1;
+        }
         tris.push(Triangle {
-            verts: [poly_verts[1].0, poly_verts[0].0, poly_verts[2].0], // wont work with reversed winding order TODO later
+            verts: [
+                to_index(poly_verts[first].0),
+                to_index(poly_verts[second].0),
+                to_index(poly_verts[third].0),
+            ],
             mtl: cur_mtl.clone(),
-            texes: [poly_verts[1].1, poly_verts[0].1, poly_verts[2].1],
-            norms: [poly_verts[1].2, poly_verts[0].2, poly_verts[2].2],
+            texes: [
+                to_index(poly_verts[first].1),
+                to_index(poly_verts[second].1),
+                to_index(poly_verts[third].1),
+            ],
+            norms: [
+                to_index(poly_verts[first].2),
+                to_index(poly_verts[second].2),
+                to_index(poly_verts[third].2),
+            ],
         });
         poly_verts.remove(1);
     }
