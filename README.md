@@ -15,9 +15,10 @@ You can replace `objects/skyscraper.obj` with any `.obj` file.
 
 Polygons:
  1. ff any degree >= 3 are suppored
- 2. without a material will be rendered `SKYBLUE`
+ 2. without a material will be rendered `DIM`
  3. with a material will use the corresponding `.mtl` definition.
 
+Check out my [blog post](https://b.neilhommes.xyz/2025/06/16/engine/) that talks a bit about the foundations of computer graphics.
 
 > `.mtl` file paths are from the root of the project directory. For example `vp.mtl`.
 
