@@ -27,7 +27,7 @@ use crate::mesh::TextureCoord;
 const WIDTH: usize = 500;
 const HEIGHT: usize = 500;
 
-pub struct Object {
+struct Object {
     mesh: Box<dyn Mesh>,
     offset_x: f32,
     offset_y: f32,
@@ -44,7 +44,15 @@ struct Args {
     normals: bool,
 }
 
-pub struct Camera {
+struct TriParam {
+    screen_verts: [Point2<f32>; 3],
+    normals: [Vector3<f32>; 3],
+    z_values: [f32; 3],
+    texture_coords: Option<[TextureCoord; 3]>,
+    w_values: [f32; 3],
+}
+
+struct Camera {
     pub position: Point3<f32>,
     pub target: Point3<f32>,
     pub up: Vector3<f32>,
@@ -52,14 +60,13 @@ pub struct Camera {
     pub yaw: f32,
 }
 
-pub struct Light {
+struct Light {
     pub position: Point3<f32>,
     pub target: Point3<f32>,
-    pub intensity: f32,
     pub ambient: f32,
 }
 
-pub struct World {
+struct World {
     pub camera: Camera,
     pub light: Light,
     pub models: Vec<Object>,
@@ -205,14 +212,16 @@ impl World {
                 let t3 = texture_coords.get(tri.texes[2]);
 
                 self.draw_triangle(
-                    [s1, s2, s3],
-                    [n1, n2, n3],
-                    [z1, z2, z3],
-                    match (t1, t2, t3) {
-                        (Some(tc1), Some(tc2), Some(tc3)) => Some([*tc1, *tc2, *tc3]),
-                        _ => None,
+                    TriParam {
+                        screen_verts: [s1, s2, s3],
+                        normals: [n1, n2, n3],
+                        z_values: [z1, z2, z3],
+                        texture_coords: match (t1, t2, t3) {
+                            (Some(tc1), Some(tc2), Some(tc3)) => Some([*tc1, *tc2, *tc3]),
+                            _ => None,
+                        },
+                        w_values: [w1, w2, w3],
                     },
-                    [w1, w2, w3],
                     &tri.mtl,
                     frame,
                     &mut zbuffer,
@@ -226,19 +235,15 @@ impl World {
 
     fn draw_triangle(
         &self,
-        screen_verts: [Point2<f32>; 3],
-        normals: [Vector3<f32>; 3],
-        z_values: [f32; 3],
-        texture_coords: Option<[TextureCoord; 3]>,
-        w_values: [f32; 3],
+        tri: TriParam,
         mtl: &Material,
         frame: &mut [u8],
         zbuffer: &mut [AtomicU32],
         light_dir_view: Vector3<f32>,
     ) {
-        let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
-        let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
-        let (x3, y3) = (screen_verts[2].x, screen_verts[2].y);
+        let (x1, y1) = (tri.screen_verts[0].x, tri.screen_verts[0].y);
+        let (x2, y2) = (tri.screen_verts[1].x, tri.screen_verts[1].y);
+        let (x3, y3) = (tri.screen_verts[2].x, tri.screen_verts[2].y);
         let min_x = (x1.min(x2).min(x3).max(0.0)) as usize;
         let max_x = (x1.max(x2).max(x3).min(WIDTH as f32 - 1.0) + 1.0) as usize;
         let min_y = (y1.min(y2).min(y3).max(0.0)) as usize;
@@ -248,15 +253,15 @@ impl World {
             return;
         }
 
-        let z1 = z_values[0];
-        let z2 = z_values[1];
-        let z3 = z_values[2];
-        let perspective_warp_1 = w_values[0];
-        let perspective_warp_2 = w_values[1];
-        let perspective_warp_3 = w_values[2];
-        let n1 = normals[0];
-        let n2 = normals[1];
-        let n3 = normals[2];
+        let z1 = tri.z_values[0];
+        let z2 = tri.z_values[1];
+        let z3 = tri.z_values[2];
+        let perspective_warp_1 = tri.w_values[0];
+        let perspective_warp_2 = tri.w_values[1];
+        let perspective_warp_3 = tri.w_values[2];
+        let n1 = tri.normals[0];
+        let n2 = tri.normals[1];
+        let n3 = tri.normals[2];
         let ambient = self.light.ambient;
 
         let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
@@ -320,7 +325,7 @@ impl World {
                     let one_over_z =
                         w1 * perspective_warp_1 + w2 * perspective_warp_2 + w3 * perspective_warp_3;
 
-                    if let Some([uv1, uv2, uv3]) = texture_coords {
+                    if let Some([uv1, uv2, uv3]) = tri.texture_coords {
                         let u_over_z = w1 * uv1.u * perspective_warp_1
                             + w2 * uv2.u * perspective_warp_2
                             + w3 * uv3.u * perspective_warp_3;
@@ -490,7 +495,6 @@ fn main() -> Result<(), Error> {
         Light {
             position: Point3::new(0.0, 1.0, 5.0),
             target: Point3::new(0.0, 0.0, 0.0),
-            intensity: 1.0,
             ambient: 0.1,
         },
         Perspective3::new(
