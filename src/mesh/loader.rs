@@ -1,4 +1,4 @@
-use image::DynamicImage;
+use image::{DynamicImage, ImageBuffer};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::info;
 use nalgebra::{Point2, Point3, Vector3};
@@ -10,6 +10,7 @@ use std::fmt::Write;
 use std::fs::{File, read_to_string};
 use std::hash::Hash;
 use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use std::str::SplitWhitespace;
 use std::sync::Arc;
 
@@ -33,9 +34,11 @@ impl GenericMesh {
             String::from("\x04\x06__default__\x05"),
             Arc::new(Default::default()),
         );
-        let mut cur_mtl = "\x04\x06__default_\x05";
+        let mut cur_mtl = "\x04\x06__default__\x05";
 
         let file = File::open(file_name).map_err(|e| format!("Couldn't open file: {file_name}"))?;
+        let mut obj_dir = PathBuf::from(file_name);
+        obj_dir.pop();
         let reader = BufReader::new(file);
         let total_lines = reader.lines().count();
 
@@ -57,10 +60,12 @@ impl GenericMesh {
             let mut components = line.split_whitespace();
             match components.next() {
                 Some("mtllib") => {
-                    let filename = components
+                    let mtl_filename = components
                         .next()
                         .ok_or(format!("Missing mtl filename at line: {}", lineno + 1))?;
-                    GenericMesh::parse_mtl(filename, &mut mtl_map)?
+                    let mut mtl_path = obj_dir.clone();
+                    mtl_path.push(mtl_filename);
+                    GenericMesh::parse_mtl(&mtl_path, &mut mtl_map)?
                 }
                 Some("usemtl") => {
                     cur_mtl = components
@@ -301,7 +306,7 @@ impl GenericMesh {
     }
 
     fn parse_mtl(
-        file_name: &str,
+        file_name: &Path,
         mtl_map: &mut HashMap<String, Arc<Material>>,
     ) -> Result<(), Box<dyn Error>> {
         let mut cur_mtl_name = "";
@@ -316,7 +321,7 @@ impl GenericMesh {
                         cur_mtl = Default::default();
                     }
                     cur_mtl_name = components.next().ok_or(format!(
-                        "Missing mtl name at line: {} in file {}",
+                        "Missing mtl name at line: {} in file {:?}",
                         lineno + 1,
                         file_name
                     ))?;
@@ -334,7 +339,7 @@ impl GenericMesh {
                     cur_mtl.transparency = components
                         .next()
                         .ok_or(format!(
-                            "Missing transparency at line: {} in file {}",
+                            "Missing transparency at line: {} in file {:?}",
                             lineno + 1,
                             file_name
                         ))?
@@ -394,16 +399,21 @@ impl Mesh for GenericMesh {
 fn open_image_from_line(
     components: &mut SplitWhitespace,
     lineno: usize,
-    file_name: &str,
+    file_name: &Path,
 ) -> Result<DynamicImage, Box<dyn Error>> {
-    image::open(components.next().ok_or(format!(
-        "Missing image filename at line: {} in file {}",
+    let mut image_file = components.next().ok_or(format!(
+        "Missing image filename at line: {} in file {:?}",
         lineno + 1,
         file_name
-    ))?)
-    .map_err(|e| {
+    ))?;
+
+    let mut image_with_path = PathBuf::from(file_name).clone();
+    image_with_path.pop();
+    image_with_path.push(image_file);
+
+    image::open(image_with_path).map_err(|e| {
         Box::<dyn Error>::from(format!(
-            "Failed to open file at line: {} in file {}",
+            "Failed to open file at line: {} in file {:?}",
             lineno + 1,
             file_name
         ))
@@ -413,13 +423,13 @@ fn open_image_from_line(
 fn color_from_line(
     components: &mut SplitWhitespace,
     lineno: usize,
-    file_name: &str,
+    file_name: &Path,
 ) -> Result<Color, Box<dyn Error>> {
     Ok(Color {
         r: components
             .next()
             .ok_or(format!(
-                "Missing r component at line: {} in file {}",
+                "Missing r component at line: {} in file {:?}",
                 lineno + 1,
                 file_name
             ))?
@@ -428,7 +438,7 @@ fn color_from_line(
         g: components
             .next()
             .ok_or(format!(
-                "Missing g component at line: {} in file {}",
+                "Missing g component at line: {} in file {:?}",
                 lineno + 1,
                 file_name
             ))?
@@ -437,7 +447,7 @@ fn color_from_line(
         b: components
             .next()
             .ok_or(format!(
-                "Missing b component at line: {} in file {}",
+                "Missing b component at line: {} in file {:?}",
                 lineno + 1,
                 file_name
             ))?

@@ -1,6 +1,6 @@
 # Blender v2.79 (sub 0) OBJ File: 'cottage_blender.blend'
 # www.blender.org
-mtllib objects/cottage_obj.mtl
+mtllib cottage_obj.mtl
 o ground_Plane.004
 v -63.196327 0.077648 63.196327
 v 63.196327 0.077648 63.196327

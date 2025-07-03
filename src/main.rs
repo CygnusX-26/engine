@@ -84,6 +84,8 @@ impl World {
 
     pub fn draw(&mut self, view_mat: Matrix4<f32>, frame: &mut [u8], flip_normals: bool) {
         frame.fill(255);
+        let light_dir_world = (self.light.target - self.light.position).normalize();
+        let light_dir_view = (view_mat.fixed_view::<3, 3>(0, 0) * light_dir_world).normalize();
         let model_with_mats: Vec<(&Object, Matrix4<f32>)> = self
             .models
             .iter()
@@ -122,7 +124,7 @@ impl World {
         // Iterate over meshes in sorted zbuffer order
         for (model, model_mat) in &model_with_mats {
             let mesh = &model.mesh;
-            let normal_mat = model_mat
+            let normal_mat = (view_mat * model_mat)
                 .fixed_view::<3, 3>(0, 0)
                 .try_inverse()
                 .unwrap()
@@ -214,6 +216,7 @@ impl World {
                     &tri.mtl,
                     frame,
                     &mut zbuffer,
+                    light_dir_view,
                 );
             }
             screen_verts.clear();
@@ -231,6 +234,7 @@ impl World {
         mtl: &Material,
         frame: &mut [u8],
         zbuffer: &mut [AtomicU32],
+        light_dir_view: Vector3<f32>,
     ) {
         let (x1, y1) = (screen_verts[0].x, screen_verts[0].y);
         let (x2, y2) = (screen_verts[1].x, screen_verts[1].y);
@@ -253,7 +257,6 @@ impl World {
         let n1 = normals[0];
         let n2 = normals[1];
         let n3 = normals[2];
-        let light_dir = (self.light.position - self.light.target).normalize();
         let ambient = self.light.ambient;
 
         let edge = |(ax, ay): (f32, f32), (bx, by): (f32, f32), (px, py): (f32, f32)| -> f32 {
@@ -355,7 +358,7 @@ impl World {
                     )
                     .normalize();
 
-                    let diffuse = light_dir.dot(&interpolated_normal).clamp(0.1, 1.0);
+                    let diffuse = light_dir_view.dot(&interpolated_normal).clamp(0.1, 1.0);
                     let specular = 0.0; //no fancy lighting for now its too laggy
                     let color = ka * ambient + kd * diffuse + ks * specular;
                     row[idx..idx + 4].copy_from_slice(&[
@@ -548,7 +551,7 @@ fn main() -> Result<(), Error> {
             world.camera.target.x = world.camera.position.x + radius * pitch.cos() * yaw.sin();
             world.camera.target.y = world.camera.position.y + radius * pitch.sin();
             world.camera.target.z = world.camera.position.z + radius * pitch.cos() * yaw.cos();
-            handle_keys(&input, &mut world.camera, 0.5);
+            handle_keys(&input, &mut world.camera, 1.0);
             window.request_redraw();
         }
     });

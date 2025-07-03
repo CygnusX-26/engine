@@ -30,7 +30,7 @@ Polygons:
 
 Check out my [blog post](https://b.neilhommes.xyz/2025/06/16/engine/) that talks a bit about the foundations of computer graphics.
 
-> `.mtl` file paths are from the root of the project directory. For example `vp.mtl`.
+> `.mtl` file paths are RELATIVE to their .obj files.
 
 ## Credits
 
